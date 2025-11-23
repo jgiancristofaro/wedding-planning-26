@@ -1,14 +1,16 @@
+
 import React, { useState, useMemo } from 'react';
-import { Vendor } from '../types';
-import { DollarSign, Tag, FileText, Search, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Vendor, ConsiderationStatus } from '../types';
+import { DollarSign, Tag, Search, SlidersHorizontal, ArrowUpDown, ChevronDown } from 'lucide-react';
 
 interface VendorListProps {
   vendors: Vendor[];
+  onUpdateVendor: (vendor: Vendor) => void;
 }
 
-type SortOption = 'price-asc' | 'price-desc' | 'name-asc';
+type SortOption = 'price-asc' | 'price-desc' | 'name-asc' | 'status';
 
-export const VendorList: React.FC<VendorListProps> = ({ vendors }) => {
+export const VendorList: React.FC<VendorListProps> = ({ vendors, onUpdateVendor }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [maxPrice, setMaxPrice] = useState('');
@@ -37,6 +39,13 @@ export const VendorList: React.FC<VendorListProps> = ({ vendors }) => {
           case 'price-asc': return a.price - b.price;
           case 'price-desc': return b.price - a.price;
           case 'name-asc': return a.vendor_name.localeCompare(b.vendor_name);
+          case 'status': {
+             // Custom sort order for status
+             const order: Record<ConsiderationStatus, number> = { 'Priority': 0, 'Maybe': 1, "Haven't looked": 2, 'No': 3 };
+             const statusA = a.status || "Haven't looked";
+             const statusB = b.status || "Haven't looked";
+             return order[statusA] - order[statusB];
+          }
           default: return 0;
         }
       });
@@ -47,6 +56,15 @@ export const VendorList: React.FC<VendorListProps> = ({ vendors }) => {
     setSelectedCategory('All');
     setMaxPrice('');
     setSortOption('name-asc');
+  };
+
+  const getStatusStyle = (status: ConsiderationStatus) => {
+    switch (status) {
+      case 'Priority': return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
+      case 'Maybe': return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200';
+      case 'No': return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200';
+    }
   };
 
   if (vendors.length === 0) {
@@ -91,6 +109,7 @@ export const VendorList: React.FC<VendorListProps> = ({ vendors }) => {
                   <option value="name-asc">Sort: A-Z</option>
                   <option value="price-asc">Price: Low to High</option>
                   <option value="price-desc">Price: High to Low</option>
+                  <option value="status">Status: Priority First</option>
                 </select>
             </div>
           </div>
@@ -147,16 +166,32 @@ export const VendorList: React.FC<VendorListProps> = ({ vendors }) => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-wedding-50 border-b border-wedding-200">
-                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider">Vendor Name</th>
-                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider">Category</th>
-                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider">Est. Price</th>
-                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider">Notes</th>
+                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider w-1/4">Vendor Name</th>
+                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider w-1/6">Status</th>
+                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider w-1/6">Category</th>
+                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider w-1/6">Est. Price</th>
+                  <th className="p-4 text-xs font-bold text-wedding-700 uppercase tracking-wider w-1/4">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-wedding-100">
                 {filteredAndSortedVendors.map((vendor) => (
                   <tr key={vendor.id} className="hover:bg-wedding-50/50 transition-colors">
                     <td className="p-4 font-medium text-gray-900">{vendor.vendor_name}</td>
+                    <td className="p-4">
+                        <div className="relative inline-block">
+                           <select 
+                            value={vendor.status || "Haven't looked"}
+                            onChange={(e) => onUpdateVendor({...vendor, status: e.target.value as ConsiderationStatus})}
+                            className={`appearance-none text-xs font-bold uppercase tracking-wider rounded-full py-1.5 pl-3 pr-8 border outline-none cursor-pointer transition-colors shadow-sm ${getStatusStyle(vendor.status || "Haven't looked")}`}
+                           >
+                             <option value="Haven't looked">New</option>
+                             <option value="Maybe">Maybe</option>
+                             <option value="Priority">Priority</option>
+                             <option value="No">No</option>
+                           </select>
+                           <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                        </div>
+                    </td>
                     <td className="p-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-wedding-100 text-wedding-800 border border-wedding-200">
                         <Tag className="w-3 h-3 mr-1" />

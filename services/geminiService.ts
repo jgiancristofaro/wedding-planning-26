@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Venue, Vendor } from "../types";
 import * as XLSX from "xlsx";
@@ -83,7 +84,7 @@ const vendorSchema = {
   }
 };
 
-export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id'>[]> => {
+export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id' | 'status'>[]> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error("Gemini API Key is missing. Please check your environment configuration.");
@@ -128,7 +129,7 @@ export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id'>[]>
   return JSON.parse(response.text);
 };
 
-export const extractVendorData = async (file: File): Promise<Omit<Vendor, 'id'>[]> => {
+export const extractVendorData = async (file: File): Promise<Omit<Vendor, 'id' | 'status'>[]> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error("Gemini API Key is missing. Please check your environment configuration.");

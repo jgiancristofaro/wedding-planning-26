@@ -6,10 +6,11 @@ import { VenueList } from './components/VenueList';
 import { VendorList } from './components/VendorList';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
+import { VenueModal } from './components/VenueModal';
 import { Venue, Vendor, Tab, INITIAL_STATE, AppState, SyncConfig } from './types';
 import { extractVenueData, extractVendorData } from './services/geminiService';
 import { initSync, startAutoSync, saveDataToCloud, verifyConnection, fetchFromCloud } from './services/storageService';
-import { LayoutDashboard, MapPin, Users, Download, Trash2, Settings as SettingsIcon, Cloud } from 'lucide-react';
+import { LayoutDashboard, MapPin, Users, Download, Trash2, Settings as SettingsIcon, Plus } from 'lucide-react';
 import { APP_CONFIG } from './config';
 
 const App: React.FC = () => {
@@ -29,7 +30,9 @@ const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<Tab>(Tab.VENUES);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Modal State for Manual Add
+  const [isAddVenueModalOpen, setIsAddVenueModalOpen] = useState(false);
   
   // Sync Config & Status
   const [syncConfig, setSyncConfig] = useState<SyncConfig | null>(() => {
@@ -141,72 +144,116 @@ const App: React.FC = () => {
     }
   };
 
-  const handleVenueUpload = async (files: FileList) => {
-    setIsLoading(true);
-    try {
-      const newVenues: Venue[] = [...state.venues];
-      
-      for (let i = 0; i < files.length; i++) {
-        const extractedList = await extractVenueData(files[i]);
-        
-        for (const extracted of extractedList) {
-          const existingIndex = newVenues.findIndex(
-            v => v.venue_name.toLowerCase() === extracted.venue_name.toLowerCase()
-          );
+  // --- VENUE HANDLERS ---
 
-          if (existingIndex >= 0) {
-            newVenues[existingIndex] = {
-              ...newVenues[existingIndex],
-              ...extracted,
-              notes: extracted.notes || newVenues[existingIndex].notes,
-              booking_price: extracted.booking_price || newVenues[existingIndex].booking_price
-            };
-          } else {
-            newVenues.push({ ...extracted, id: crypto.randomUUID() });
-          }
-        }
+  const handleVenueComplete = (newVenuesData: Omit<Venue, 'id' | 'status'>[]) => {
+    const newVenues: Venue[] = [...state.venues];
+    
+    for (const extracted of newVenuesData) {
+      const existingIndex = newVenues.findIndex(
+        v => v.venue_name.toLowerCase() === extracted.venue_name.toLowerCase()
+      );
+
+      if (existingIndex >= 0) {
+        newVenues[existingIndex] = {
+          ...newVenues[existingIndex],
+          ...extracted,
+          notes: extracted.notes || newVenues[existingIndex].notes,
+          booking_price: extracted.booking_price || newVenues[existingIndex].booking_price,
+           // Preserve existing status or default
+          status: newVenues[existingIndex].status || "Haven't looked"
+        };
+      } else {
+        newVenues.push({ 
+          ...extracted, 
+          id: crypto.randomUUID(),
+          status: "Haven't looked"
+        });
       }
-      updateData({ ...state, venues: newVenues });
-    } finally {
-      setIsLoading(false);
     }
+    updateData({ ...state, venues: newVenues });
   };
 
-  const handleVendorUpload = async (files: FileList) => {
-    setIsLoading(true);
-    try {
-      const newVendors: Vendor[] = [...state.vendors];
-      
-      for (let i = 0; i < files.length; i++) {
-        const extractedList = await extractVendorData(files[i]);
-        
-        for (const extracted of extractedList) {
-          const existingIndex = newVendors.findIndex(
-            v => v.vendor_name.toLowerCase() === extracted.vendor_name.toLowerCase() &&
-                 v.category.toLowerCase() === extracted.category.toLowerCase()
-          );
-
-          if (existingIndex >= 0) {
-             newVendors[existingIndex] = { ...newVendors[existingIndex], ...extracted };
-          } else {
-            newVendors.push({ ...extracted, id: crypto.randomUUID() });
-          }
-        }
-      }
-      updateData({ ...state, vendors: newVendors });
-    } finally {
-      setIsLoading(false);
-    }
+  const handleAddVenue = (newVenueData: Omit<Venue, 'id'>) => {
+    const newVenue: Venue = {
+      ...newVenueData,
+      id: crypto.randomUUID()
+    };
+    updateData({ ...state, venues: [...state.venues, newVenue] });
   };
+
+  const handleVenueUpdate = (updatedVenue: Venue) => {
+    const newVenues = state.venues.map(v => v.id === updatedVenue.id ? updatedVenue : v);
+    updateData({ ...state, venues: newVenues });
+  };
+
+  // --- VENDOR HANDLERS ---
+
+  const handleVendorComplete = (newVendorsData: Omit<Vendor, 'id' | 'status'>[]) => {
+    const newVendors: Vendor[] = [...state.vendors];
+    
+    for (const extracted of newVendorsData) {
+      const existingIndex = newVendors.findIndex(
+        v => v.vendor_name.toLowerCase() === extracted.vendor_name.toLowerCase() &&
+             v.category.toLowerCase() === extracted.category.toLowerCase()
+      );
+
+      if (existingIndex >= 0) {
+         newVendors[existingIndex] = { 
+           ...newVendors[existingIndex], 
+           ...extracted,
+           // Preserve existing status if updating, fallback to default if missing for some reason
+           status: newVendors[existingIndex].status || "Haven't looked"
+         };
+      } else {
+        newVendors.push({ 
+          ...extracted, 
+          id: crypto.randomUUID(),
+          status: "Haven't looked"
+        });
+      }
+    }
+    updateData({ ...state, vendors: newVendors });
+  };
+
+  const handleVendorUpdate = (updatedVendor: Vendor) => {
+    const newVendors = state.vendors.map(v => v.id === updatedVendor.id ? updatedVendor : v);
+    updateData({ ...state, vendors: newVendors });
+  };
+
+  // --- EXPORT / CLEAR ---
 
   const downloadCSV = useCallback((type: 'venues' | 'vendors') => {
     const data = type === 'venues' ? state.venues : state.vendors;
     if (!data.length) return;
 
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(obj => Object.values(obj).map(val => `"${val}"`).join(','));
-    const csvContent = [headers, ...rows].join('\n');
-    
+    let headers: string[] = [];
+    let rows: string[] = [];
+
+    const formatValue = (val: any) => `"${String(val || '').replace(/"/g, '""')}"`;
+
+    if (type === 'venues') {
+      headers = [
+        'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Price', 
+        'Per Person Cost', 'Food & Bev', 'Admin Fees', 'Vibe', 'Notes'
+      ];
+      
+      rows = (data as Venue[]).map(v => [
+        v.venue_name, v.status || "Haven't looked", v.location, v.capacity, v.booking_price,
+        v.per_person_cost, v.food_bev_cost, v.admin_fees, v.vibe, v.notes
+      ].map(formatValue).join(','));
+
+    } else {
+      headers = [
+        'Vendor Name', 'Status', 'Category', 'Price', 'Notes'
+      ];
+      
+      rows = (data as Vendor[]).map(v => [
+        v.vendor_name, v.status || "Haven't looked", v.category, v.price, v.notes
+      ].map(formatValue).join(','));
+    }
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -225,9 +272,7 @@ const App: React.FC = () => {
   const handleConfigSave = async (config: SyncConfig) => {
     setIsConnecting(true);
     setConnectionError(null);
-    
     initSync(config);
-    
     try {
       const result = await verifyConnection(config);
       if (result.valid) {
@@ -318,15 +363,29 @@ const App: React.FC = () => {
                   <h2 className="text-2xl font-serif font-bold text-wedding-900">Venue Organizer</h2>
                   <p className="text-wedding-600 mt-1">Manage and compare your potential wedding locations.</p>
                 </div>
+                <button 
+                  onClick={() => setIsAddVenueModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-wedding-700 text-white text-sm font-bold rounded-lg hover:bg-wedding-900 transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Venue Manually
+                </button>
               </div>
               
-              <FileUpload 
+              <FileUpload<Omit<Venue, 'id' | 'status'>>
                 label="Venue" 
-                onUpload={handleVenueUpload} 
-                isLoading={isLoading}
+                onProcessFile={extractVenueData}
+                onComplete={handleVenueComplete}
               />
               
-              <VenueList venues={state.venues} />
+              <VenueList venues={state.venues} onUpdateVenue={handleVenueUpdate} />
+              
+              <VenueModal
+                venue={null}
+                isOpen={isAddVenueModalOpen}
+                onClose={() => setIsAddVenueModalOpen(false)}
+                onSave={handleAddVenue}
+              />
             </div>
           )}
 
@@ -339,13 +398,13 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <FileUpload 
+              <FileUpload<Omit<Vendor, 'id' | 'status'>>
                 label="Vendor" 
-                onUpload={handleVendorUpload} 
-                isLoading={isLoading}
+                onProcessFile={extractVendorData}
+                onComplete={handleVendorComplete}
               />
               
-              <VendorList vendors={state.vendors} />
+              <VendorList vendors={state.vendors} onUpdateVendor={handleVendorUpdate} />
             </div>
           )}
 

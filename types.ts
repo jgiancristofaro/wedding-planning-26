@@ -1,3 +1,4 @@
+
 export interface Venue {
   id: string;
   venue_name: string;
@@ -9,7 +10,10 @@ export interface Venue {
   admin_fees: string;
   vibe: string;
   notes: string;
+  status: ConsiderationStatus;
 }
+
+export type ConsiderationStatus = "Haven't looked" | "No" | "Maybe" | "Priority";
 
 export interface Vendor {
   id: string;
@@ -17,6 +21,7 @@ export interface Vendor {
   category: string;
   price: number; // Normalized
   notes: string;
+  status: ConsiderationStatus;
 }
 
 export enum Tab {

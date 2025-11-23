@@ -1,22 +1,29 @@
+
 import React, { useState, useMemo } from 'react';
-import { Venue } from '../types';
-import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, X } from 'lucide-react';
+import { Venue, ConsiderationStatus } from '../types';
+import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2 } from 'lucide-react';
+import { VenueModal } from './VenueModal';
 
 interface VenueListProps {
   venues: Venue[];
+  onUpdateVenue: (venue: Venue) => void;
 }
 
-type SortOption = 'price-asc' | 'price-desc' | 'capacity-desc' | 'name-asc';
+type SortOption = 'price-asc' | 'price-desc' | 'capacity-desc' | 'name-asc' | 'status';
 
-export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
+export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue }) => {
   // --- State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVibe, setSelectedVibe] = useState<string>('All');
   const [selectedLocation, setSelectedLocation] = useState<string>('All');
+  const [selectedStatus, setSelectedStatus] = useState<string>('All'); // New Status Filter State
   const [minCapacity, setMinCapacity] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortOption, setSortOption] = useState<SortOption>('name-asc');
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Modal State
+  const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
 
   // --- Derived Data for Dropdowns ---
   const uniqueVibes = useMemo(() => {
@@ -41,11 +48,12 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
         
         const matchesVibe = selectedVibe === 'All' || (venue.vibe || 'Uncategorized') === selectedVibe;
         const matchesLocation = selectedLocation === 'All' || (venue.location?.trim() || 'Unknown') === selectedLocation;
+        const matchesStatus = selectedStatus === 'All' || (venue.status || "Haven't looked") === selectedStatus;
         
         const matchesCapacity = minCapacity === '' || venue.capacity >= parseInt(minCapacity);
         const matchesPrice = maxPrice === '' || venue.booking_price <= parseInt(maxPrice);
 
-        return matchesSearch && matchesVibe && matchesLocation && matchesCapacity && matchesPrice;
+        return matchesSearch && matchesVibe && matchesLocation && matchesStatus && matchesCapacity && matchesPrice;
       })
       .sort((a, b) => {
         switch (sortOption) {
@@ -53,18 +61,41 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
           case 'price-desc': return b.booking_price - a.booking_price;
           case 'capacity-desc': return b.capacity - a.capacity;
           case 'name-asc': return a.venue_name.localeCompare(b.venue_name);
+          case 'status': {
+             const order: Record<ConsiderationStatus, number> = { 'Priority': 0, 'Maybe': 1, "Haven't looked": 2, 'No': 3 };
+             const statusA = a.status || "Haven't looked";
+             const statusB = b.status || "Haven't looked";
+             return order[statusA] - order[statusB];
+          }
           default: return 0;
         }
       });
-  }, [venues, searchTerm, selectedVibe, selectedLocation, minCapacity, maxPrice, sortOption]);
+  }, [venues, searchTerm, selectedVibe, selectedLocation, selectedStatus, minCapacity, maxPrice, sortOption]);
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedVibe('All');
     setSelectedLocation('All');
+    setSelectedStatus('All');
     setMinCapacity('');
     setMaxPrice('');
     setSortOption('name-asc');
+  };
+
+  const getStatusStyle = (status: ConsiderationStatus) => {
+    switch (status) {
+      case 'Priority': return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
+      case 'Maybe': return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200';
+      case 'No': return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200';
+    }
+  };
+
+  const handleSaveEdit = (updatedData: Omit<Venue, 'id'>) => {
+    if (editingVenue) {
+      onUpdateVenue({ ...updatedData, id: editingVenue.id });
+      setEditingVenue(null);
+    }
   };
 
   if (venues.length === 0) {
@@ -112,6 +143,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
                   <option value="price-asc">Price: Low to High</option>
                   <option value="price-desc">Price: High to Low</option>
                   <option value="capacity-desc">Capacity: Highest First</option>
+                  <option value="status">Status: Priority First</option>
                 </select>
             </div>
           </div>
@@ -119,8 +151,23 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
 
         {/* Filter Drawer */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-wedding-100 animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-wedding-100 animate-fade-in">
             
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Status</label>
+              <select 
+                value={selectedStatus} 
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Priority">Priority</option>
+                <option value="Maybe">Maybe</option>
+                <option value="Haven't looked">New / Unseen</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Vibe</label>
               <select 
@@ -165,7 +212,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
               />
             </div>
             
-            <div className="md:col-span-4 flex justify-end">
+            <div className="col-span-1 sm:col-span-2 lg:col-span-5 flex justify-end">
               <button onClick={clearFilters} className="text-xs text-wedding-600 hover:text-wedding-800 underline">
                 Reset all filters
               </button>
@@ -191,21 +238,47 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredAndSortedVenues.map((venue) => (
-            <div key={venue.id} className="group bg-white rounded-xl shadow-sm border border-wedding-100 overflow-hidden hover:shadow-lg hover:border-wedding-300 transition-all duration-300 flex flex-col">
+            <div 
+              key={venue.id} 
+              onClick={() => setEditingVenue(venue)}
+              className="group bg-white rounded-xl shadow-sm border border-wedding-100 overflow-hidden hover:shadow-lg hover:border-wedding-300 transition-all duration-300 flex flex-col relative cursor-pointer"
+            >
+              {/* Header */}
               <div className="bg-wedding-50 p-4 border-b border-wedding-100 flex justify-between items-start group-hover:bg-wedding-100/50 transition-colors">
-                <div>
-                  <h3 className="font-serif text-xl font-bold text-wedding-900">{venue.venue_name}</h3>
+                <div className="flex-1 pr-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif text-xl font-bold text-wedding-900 group-hover:text-wedding-700 transition-colors">{venue.venue_name}</h3>
+                    <Edit2 className="w-3 h-3 text-wedding-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                   <div className="flex items-center text-wedding-600 text-sm mt-1">
                     <MapPin className="w-3 h-3 mr-1" />
                     {venue.location}
                   </div>
                 </div>
-                <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-wedding-700 border border-wedding-200 shadow-sm uppercase tracking-wider whitespace-nowrap">
-                  {venue.vibe || 'Venue'}
-                </span>
+                {/* STATUS DROPDOWN - TOP RIGHT */}
+                <div className="relative group/status" onClick={(e) => e.stopPropagation()}>
+                  <select 
+                      value={venue.status || "Haven't looked"}
+                      onChange={(e) => onUpdateVenue({...venue, status: e.target.value as ConsiderationStatus})}
+                      className={`appearance-none pr-8 pl-3 py-1.5 rounded-full text-xs font-bold border shadow-sm outline-none cursor-pointer transition-colors uppercase tracking-wider ${getStatusStyle(venue.status || "Haven't looked")}`}
+                    >
+                      <option value="Haven't looked">New</option>
+                      <option value="Maybe">Maybe</option>
+                      <option value="Priority">Priority</option>
+                      <option value="No">No</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+                </div>
               </div>
               
               <div className="p-5 space-y-4 flex-1">
+                {/* Vibe Tag */}
+                <div className="mb-2">
+                   <span className="inline-block bg-white px-2 py-0.5 rounded-md text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide">
+                    {venue.vibe || 'Venue'}
+                  </span>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-wedding-400 uppercase tracking-wider font-bold">Capacity</p>
@@ -247,6 +320,16 @@ export const VenueList: React.FC<VenueListProps> = ({ venues }) => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Edit Modal - Replaced with generic VenueModal */}
+      {editingVenue && (
+        <VenueModal
+          venue={editingVenue}
+          isOpen={!!editingVenue}
+          onClose={() => setEditingVenue(null)}
+          onSave={handleSaveEdit}
+        />
       )}
     </div>
   );
