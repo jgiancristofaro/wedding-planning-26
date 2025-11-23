@@ -1,0 +1,5 @@
+{
+  "name": "Wedding Planner AI",
+  "description": "An intelligent wedding organizer that extracts venue and vendor details from PDFs and documents using Gemini AI.",
+  "requestFramePermissions": []
+}
