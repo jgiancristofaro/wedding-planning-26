@@ -11,6 +11,8 @@ export interface Venue {
   vibe: string;
   notes: string;
   status: ConsiderationStatus;
+  lastUpdated?: number;
+  updateDescription?: string;
 }
 
 export type ConsiderationStatus = "Haven't looked" | "No" | "Maybe" | "Priority";
@@ -22,6 +24,8 @@ export interface Vendor {
   price: number; // Normalized
   notes: string;
   status: ConsiderationStatus;
+  lastUpdated?: number;
+  updateDescription?: string;
 }
 
 export enum Tab {
@@ -29,6 +33,7 @@ export enum Tab {
   VENDORS = 'VENDORS',
   DASHBOARD = 'DASHBOARD',
   SETTINGS = 'SETTINGS',
+  UPDATES = 'UPDATES',
 }
 
 export interface AppState {

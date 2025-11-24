@@ -7,11 +7,12 @@ import { VenueModal } from './VenueModal';
 interface VenueListProps {
   venues: Venue[];
   onUpdateVenue: (venue: Venue) => void;
+  onDeleteVenue: (venueId: string) => void;
 }
 
 type SortOption = 'price-asc' | 'price-desc' | 'capacity-desc' | 'name-asc' | 'status';
 
-export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue }) => {
+export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onDeleteVenue }) => {
   // --- State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVibe, setSelectedVibe] = useState<string>('All');
@@ -322,13 +323,17 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue }) =
         </div>
       )}
 
-      {/* Edit Modal - Replaced with generic VenueModal */}
+      {/* Edit Modal */}
       {editingVenue && (
         <VenueModal
           venue={editingVenue}
           isOpen={!!editingVenue}
           onClose={() => setEditingVenue(null)}
           onSave={handleSaveEdit}
+          onDelete={() => {
+            onDeleteVenue(editingVenue.id);
+            setEditingVenue(null);
+          }}
         />
       )}
     </div>

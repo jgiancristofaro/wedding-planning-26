@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus } from 'lucide-react';
+import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2 } from 'lucide-react';
 
 interface VenueModalProps {
   venue?: Venue | null; // If null/undefined, we are in "Add Mode"
   isOpen: boolean;
   onClose: () => void;
   onSave: (venueData: Omit<Venue, 'id'>) => void;
+  onDelete?: () => void;
 }
 
 const DEFAULT_VENUE: Omit<Venue, 'id'> = {
@@ -23,8 +24,9 @@ const DEFAULT_VENUE: Omit<Venue, 'id'> = {
   status: "Haven't looked"
 };
 
-export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, onSave }) => {
+export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, onSave, onDelete }) => {
   const [formData, setFormData] = useState<Omit<Venue, 'id'>>(DEFAULT_VENUE);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Initialize form based on mode (Edit vs Add)
   useEffect(() => {
@@ -34,6 +36,8 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
     } else {
       setFormData(DEFAULT_VENUE);
     }
+    // Reset delete confirmation state when modal opens/changes
+    setShowDeleteConfirm(false);
   }, [venue, isOpen]);
 
   if (!isOpen) return null;
@@ -230,22 +234,57 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-wedding-100 bg-gray-50 rounded-b-2xl flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="venue-form"
-            className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-wedding-700 hover:bg-wedding-900 rounded-lg shadow-sm transition-colors"
-          >
-            {isEditMode ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {isEditMode ? 'Save Changes' : 'Add Venue'}
-          </button>
+        <div className="p-4 border-t border-wedding-100 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+          {/* Delete Action (Left) */}
+          <div className="flex-1">
+             {isEditMode && onDelete && (
+               !showDeleteConfirm ? (
+                 <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                 >
+                   <Trash2 className="w-4 h-4" />
+                   Delete
+                 </button>
+               ) : (
+                 <div className="flex items-center gap-2 animate-fade-in">
+                   <span className="text-xs font-bold text-red-600 uppercase tracking-wide mr-1">Are you sure?</span>
+                   <button
+                    onClick={onDelete}
+                    className="px-3 py-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                   >
+                     Yes, Delete
+                   </button>
+                   <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-3 py-1 text-xs font-bold text-gray-500 hover:bg-gray-200 rounded-md transition-colors"
+                   >
+                     Cancel
+                   </button>
+                 </div>
+               )
+             )}
+          </div>
+
+          {/* Primary Actions (Right) */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="venue-form"
+              className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-wedding-700 hover:bg-wedding-900 rounded-lg shadow-sm transition-colors"
+            >
+              {isEditMode ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isEditMode ? 'Save Changes' : 'Add Venue'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

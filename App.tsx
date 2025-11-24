@@ -6,11 +6,12 @@ import { VenueList } from './components/VenueList';
 import { VendorList } from './components/VendorList';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
+import { RecentUpdates } from './components/RecentUpdates';
 import { VenueModal } from './components/VenueModal';
 import { Venue, Vendor, Tab, INITIAL_STATE, AppState, SyncConfig } from './types';
 import { extractVenueData, extractVendorData } from './services/geminiService';
 import { initSync, startAutoSync, saveDataToCloud, verifyConnection, fetchFromCloud } from './services/storageService';
-import { LayoutDashboard, MapPin, Users, Download, Trash2, Settings as SettingsIcon, Plus } from 'lucide-react';
+import { LayoutDashboard, MapPin, Users, Download, Trash2, Settings as SettingsIcon, Plus, History } from 'lucide-react';
 import { APP_CONFIG } from './config';
 
 const App: React.FC = () => {
@@ -148,6 +149,7 @@ const App: React.FC = () => {
 
   const handleVenueComplete = (newVenuesData: Omit<Venue, 'id' | 'status'>[]) => {
     const newVenues: Venue[] = [...state.venues];
+    const timestamp = Date.now();
     
     for (const extracted of newVenuesData) {
       const existingIndex = newVenues.findIndex(
@@ -155,19 +157,37 @@ const App: React.FC = () => {
       );
 
       if (existingIndex >= 0) {
+        const existing = newVenues[existingIndex];
+        const changes: string[] = [];
+
+        // Check for key field changes
+        if (extracted.booking_price > 0 && extracted.booking_price !== existing.booking_price) {
+            changes.push(`Price changed from $${existing.booking_price} to $${extracted.booking_price}`);
+        }
+        if (extracted.capacity > 0 && extracted.capacity !== existing.capacity) {
+            changes.push(`Capacity changed from ${existing.capacity} to ${extracted.capacity}`);
+        }
+        if (extracted.notes && extracted.notes.length > existing.notes.length + 10) {
+             changes.push("Notes significantly updated");
+        }
+
         newVenues[existingIndex] = {
-          ...newVenues[existingIndex],
+          ...existing,
           ...extracted,
-          notes: extracted.notes || newVenues[existingIndex].notes,
-          booking_price: extracted.booking_price || newVenues[existingIndex].booking_price,
-           // Preserve existing status or default
-          status: newVenues[existingIndex].status || "Haven't looked"
+          notes: extracted.notes || existing.notes,
+          booking_price: extracted.booking_price || existing.booking_price,
+          status: existing.status || "Haven't looked",
+          // Update timestamp only if changes detected
+          lastUpdated: changes.length > 0 ? timestamp : existing.lastUpdated,
+          updateDescription: changes.length > 0 ? changes.join('. ') : existing.updateDescription
         };
       } else {
         newVenues.push({ 
           ...extracted, 
           id: crypto.randomUUID(),
-          status: "Haven't looked"
+          status: "Haven't looked",
+          lastUpdated: timestamp,
+          updateDescription: "Newly added via upload"
         });
       }
     }
@@ -177,13 +197,24 @@ const App: React.FC = () => {
   const handleAddVenue = (newVenueData: Omit<Venue, 'id'>) => {
     const newVenue: Venue = {
       ...newVenueData,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
+      lastUpdated: Date.now(),
+      updateDescription: "Manually added"
     };
     updateData({ ...state, venues: [...state.venues, newVenue] });
   };
 
   const handleVenueUpdate = (updatedVenue: Venue) => {
-    const newVenues = state.venues.map(v => v.id === updatedVenue.id ? updatedVenue : v);
+    const newVenues = state.venues.map(v => v.id === updatedVenue.id ? {
+        ...updatedVenue,
+        lastUpdated: Date.now(),
+        updateDescription: "Manually updated"
+    } : v);
+    updateData({ ...state, venues: newVenues });
+  };
+
+  const handleDeleteVenue = (venueId: string) => {
+    const newVenues = state.venues.filter(v => v.id !== venueId);
     updateData({ ...state, venues: newVenues });
   };
 
@@ -191,6 +222,7 @@ const App: React.FC = () => {
 
   const handleVendorComplete = (newVendorsData: Omit<Vendor, 'id' | 'status'>[]) => {
     const newVendors: Vendor[] = [...state.vendors];
+    const timestamp = Date.now();
     
     for (const extracted of newVendorsData) {
       const existingIndex = newVendors.findIndex(
@@ -199,17 +231,27 @@ const App: React.FC = () => {
       );
 
       if (existingIndex >= 0) {
+         const existing = newVendors[existingIndex];
+         const changes: string[] = [];
+
+         if (extracted.price > 0 && extracted.price !== existing.price) {
+            changes.push(`Price updated from $${existing.price} to $${extracted.price}`);
+         }
+
          newVendors[existingIndex] = { 
-           ...newVendors[existingIndex], 
+           ...existing, 
            ...extracted,
-           // Preserve existing status if updating, fallback to default if missing for some reason
-           status: newVendors[existingIndex].status || "Haven't looked"
+           status: existing.status || "Haven't looked",
+           lastUpdated: changes.length > 0 ? timestamp : existing.lastUpdated,
+           updateDescription: changes.length > 0 ? changes.join('. ') : existing.updateDescription
          };
       } else {
         newVendors.push({ 
           ...extracted, 
           id: crypto.randomUUID(),
-          status: "Haven't looked"
+          status: "Haven't looked",
+          lastUpdated: timestamp,
+          updateDescription: "Newly added via upload"
         });
       }
     }
@@ -217,7 +259,11 @@ const App: React.FC = () => {
   };
 
   const handleVendorUpdate = (updatedVendor: Vendor) => {
-    const newVendors = state.vendors.map(v => v.id === updatedVendor.id ? updatedVendor : v);
+    const newVendors = state.vendors.map(v => v.id === updatedVendor.id ? {
+        ...updatedVendor,
+        lastUpdated: Date.now(),
+        updateDescription: "Manually updated"
+    } : v);
     updateData({ ...state, vendors: newVendors });
   };
 
@@ -322,6 +368,13 @@ const App: React.FC = () => {
               Analytics Dashboard
             </button>
             <button
+              onClick={() => setActiveTab(Tab.UPDATES)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 font-medium ${activeTab === Tab.UPDATES ? 'bg-wedding-500 text-white shadow-md' : 'bg-white text-wedding-900 hover:bg-wedding-100'}`}
+            >
+              <History className="w-5 h-5" />
+              Recent Updates
+            </button>
+            <button
               onClick={() => setActiveTab(Tab.SETTINGS)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 font-medium ${activeTab === Tab.SETTINGS ? 'bg-wedding-500 text-white shadow-md' : 'bg-white text-wedding-900 hover:bg-wedding-100'}`}
             >
@@ -337,7 +390,7 @@ const App: React.FC = () => {
                 <p className="text-xs uppercase text-wedding-400 font-bold tracking-wider px-4">Actions</p>
                 <button 
                   onClick={() => downloadCSV(activeTab === Tab.VENDORS ? 'vendors' : 'venues')}
-                  disabled={activeTab === Tab.DASHBOARD || activeTab === Tab.SETTINGS}
+                  disabled={activeTab === Tab.DASHBOARD || activeTab === Tab.SETTINGS || activeTab === Tab.UPDATES}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-wedding-700 hover:bg-wedding-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download className="w-4 h-4" />
@@ -378,7 +431,11 @@ const App: React.FC = () => {
                 onComplete={handleVenueComplete}
               />
               
-              <VenueList venues={state.venues} onUpdateVenue={handleVenueUpdate} />
+              <VenueList 
+                venues={state.venues} 
+                onUpdateVenue={handleVenueUpdate} 
+                onDeleteVenue={handleDeleteVenue}
+              />
               
               <VenueModal
                 venue={null}
@@ -418,6 +475,10 @@ const App: React.FC = () => {
               </div>
               <Dashboard venues={state.venues} vendors={state.vendors} />
             </div>
+          )}
+          
+          {activeTab === Tab.UPDATES && (
+             <RecentUpdates venues={state.venues} vendors={state.vendors} />
           )}
 
           {activeTab === Tab.SETTINGS && (
