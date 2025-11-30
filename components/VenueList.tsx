@@ -279,10 +279,14 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                         </div>
                     </div>
                     {/* Breakdown */}
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs border-t border-wedding-100 pt-3">
+                    <div className="grid grid-cols-4 gap-1 text-center text-xs border-t border-wedding-100 pt-3">
                         <div>
                             <span className="block text-gray-500 mb-0.5">Welcome</span>
                             <span className="font-bold text-gray-800">${venue.welcome_cost_pp || 0}</span>
+                        </div>
+                        <div className="border-l border-wedding-100">
+                            <span className="block text-gray-500 mb-0.5">Cocktail</span>
+                            <span className="font-bold text-gray-800">${venue.cocktail_cost_pp || 0}</span>
                         </div>
                         <div className="border-l border-wedding-100">
                             <span className="block text-gray-500 mb-0.5">Reception</span>

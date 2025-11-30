@@ -66,9 +66,10 @@ const venueSchema = {
       site_fee_notes: { type: Type.STRING, description: "1 sentence on inclusions" },
       food_bev_minimum: { type: Type.NUMBER },
       welcome_cost_pp: { type: Type.NUMBER, description: "Cost for 4-hour premium open bar/food" },
+      cocktail_cost_pp: { type: Type.NUMBER, description: "Cost for 1-hour premium open bar" },
       brunch_cost_pp: { type: Type.NUMBER, description: "Cost per person for brunch" },
       reception_cost_pp: { type: Type.NUMBER, description: "Dinner + 4-hour premium open bar" },
-      total_cost_pp: { type: Type.NUMBER, description: "Sum of welcome, brunch, and reception costs" },
+      total_cost_pp: { type: Type.NUMBER, description: "Sum of welcome, cocktail, brunch, and reception costs" },
     },
     required: ["venue_name", "location", "total_cost_pp"],
   }
@@ -107,8 +108,9 @@ export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id' | '
     2. For Costs: If prices vary by date, assume the wedding is in DECEMBER.
     3. For Notes: Create a 'Rate Card' summary (e.g., 'Site fee: $50k, Min guarantee: $60k').
     4. For Welcome Dinner: Look for costs associated with a 4-hour premium open bar.
-    5. For Reception: Look for costs associated with dinner + 4-hour premium open bar.
-    6. Calculate 'total_cost_pp' as the sum of reception, brunch, and welcome costs. Calculate this based on your extracted values.
+    5. For Cocktail Hour: Look for costs associated with a 1-hour premium open bar. If listed separately from the reception package, extract it here.
+    6. For Reception: Look for costs associated with dinner + 4-hour premium open bar.
+    7. Calculate 'total_cost_pp' as the sum of reception, brunch, welcome, AND cocktail costs. Calculate this based on your extracted values.
   `;
 
   if (isExcelFile(file)) {

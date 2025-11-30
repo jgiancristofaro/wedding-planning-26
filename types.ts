@@ -19,6 +19,7 @@ export interface Venue {
   welcome_cost_pp: number;
   brunch_cost_pp: number;
   reception_cost_pp: number;
+  cocktail_cost_pp?: number; // New field for Cocktail Hour
   total_cost_pp: number; // Calculated sum
 
   // Tracking

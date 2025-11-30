@@ -26,6 +26,7 @@ const DEFAULT_VENUE: Omit<Venue, 'id'> = {
   welcome_cost_pp: 0,
   brunch_cost_pp: 0,
   reception_cost_pp: 0,
+  cocktail_cost_pp: 0,
   total_cost_pp: 0,
 };
 
@@ -36,7 +37,12 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
   useEffect(() => {
     if (venue) {
       const { id, ...rest } = venue;
-      setFormData(rest);
+      // Merge with default to ensure new fields like cocktail_cost_pp are present
+      setFormData({
+        ...DEFAULT_VENUE,
+        ...rest,
+        cocktail_cost_pp: rest.cocktail_cost_pp || 0
+      });
     } else {
       setFormData(DEFAULT_VENUE);
     }
@@ -48,13 +54,14 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
     const total = 
       (Number(formData.welcome_cost_pp) || 0) + 
       (Number(formData.brunch_cost_pp) || 0) + 
-      (Number(formData.reception_cost_pp) || 0);
+      (Number(formData.reception_cost_pp) || 0) + 
+      (Number(formData.cocktail_cost_pp) || 0);
     
     // Only update if value actually changed to prevent loops
     if (total !== (formData.total_cost_pp || 0)) {
       setFormData(prev => ({ ...prev, total_cost_pp: total }));
     }
-  }, [formData.welcome_cost_pp, formData.brunch_cost_pp, formData.reception_cost_pp, formData.total_cost_pp]);
+  }, [formData.welcome_cost_pp, formData.brunch_cost_pp, formData.reception_cost_pp, formData.cocktail_cost_pp, formData.total_cost_pp]);
 
   if (!isOpen) return null;
 
@@ -226,13 +233,22 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
             <section className="space-y-4">
               <h3 className="text-sm font-bold text-wedding-500 uppercase tracking-widest border-b border-wedding-100 pb-2 mb-4">Per Person Costs</h3>
               <div className="bg-wedding-50/50 p-4 rounded-xl border border-wedding-100">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-wedding-700">Welcome ($/pp)</label>
                     <input
                       type="number"
                       value={formData.welcome_cost_pp}
                       onChange={(e) => handleChange('welcome_cost_pp', parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                    />
+                  </div>
+                   <div className="space-y-1">
+                    <label className="text-xs font-bold text-wedding-700">Cocktail ($/pp)</label>
+                    <input
+                      type="number"
+                      value={formData.cocktail_cost_pp}
+                      onChange={(e) => handleChange('cocktail_cost_pp', parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
                     />
                   </div>

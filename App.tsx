@@ -166,6 +166,11 @@ const App: React.FC = () => {
             changes.push(`Total PP Cost updated from $${existingTotalPP} to $${extracted.total_cost_pp}`);
         }
         
+        const existingCocktail = existing.cocktail_cost_pp || 0;
+        if (extracted.cocktail_cost_pp && extracted.cocktail_cost_pp !== existingCocktail) {
+            changes.push(`Cocktail Cost updated from $${existingCocktail} to $${extracted.cocktail_cost_pp}`);
+        }
+        
         const existingSiteFee = existing.site_fee || 0;
         if (extracted.site_fee > 0 && extracted.site_fee !== existingSiteFee) {
             changes.push(`Site Fee updated from $${existingSiteFee} to $${extracted.site_fee}`);
@@ -292,7 +297,7 @@ const App: React.FC = () => {
       headers = [
         'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Cost', 
         'Site Fee', 'Site Fee Notes', 'F&B Minimum', 'Admin Fees',
-        'Welcome Cost/pp', 'Reception Cost/pp', 'Brunch Cost/pp', 'Total Cost/pp',
+        'Welcome Cost/pp', 'Cocktail Hour Cost/pp', 'Reception Cost/pp', 'Brunch Cost/pp', 'Total Cost/pp',
         'Vibe', 'Notes'
       ];
       
@@ -307,6 +312,7 @@ const App: React.FC = () => {
         v.food_bev_minimum,
         v.admin_fees,
         v.welcome_cost_pp,
+        v.cocktail_cost_pp, // Added new field
         v.reception_cost_pp,
         v.brunch_cost_pp,
         v.total_cost_pp,
