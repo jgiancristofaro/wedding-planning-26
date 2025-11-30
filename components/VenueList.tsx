@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2 } from 'lucide-react';
+import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2, Utensils } from 'lucide-react';
 import { VenueModal } from './VenueModal';
 
 interface VenueListProps {
@@ -10,58 +10,61 @@ interface VenueListProps {
   onDeleteVenue: (venueId: string) => void;
 }
 
-type SortOption = 'price-asc' | 'price-desc' | 'capacity-desc' | 'name-asc' | 'status';
+type SortOption = 'total_pp-asc' | 'total_pp-desc' | 'capacity-desc' | 'name-asc' | 'status';
 
 export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onDeleteVenue }) => {
-  // --- State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVibe, setSelectedVibe] = useState<string>('All');
   const [selectedLocation, setSelectedLocation] = useState<string>('All');
-  const [selectedStatus, setSelectedStatus] = useState<string>('All'); // New Status Filter State
+  const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [minCapacity, setMinCapacity] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
-  const [sortOption, setSortOption] = useState<SortOption>('name-asc');
+  const [sortOption, setSortOption] = useState<SortOption>('total_pp-desc');
   const [showFilters, setShowFilters] = useState(false);
   
-  // Modal State
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
 
-  // --- Derived Data for Dropdowns ---
   const uniqueVibes = useMemo(() => {
     const vibes = new Set(venues.map(v => v.vibe || 'Uncategorized'));
     return ['All', ...Array.from(vibes).sort()];
   }, [venues]);
 
   const uniqueLocations = useMemo(() => {
-    // Simple normalization to avoid duplicates like "New York" vs "New York "
     const locs = new Set(venues.map(v => v.location?.trim() || 'Unknown'));
     return ['All', ...Array.from(locs).sort()];
   }, [venues]);
 
-  // --- Filtering & Sorting Logic ---
   const filteredAndSortedVenues = useMemo(() => {
     return venues
       .filter((venue) => {
         const matchesSearch = 
-          venue.venue_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          venue.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          venue.location.toLowerCase().includes(searchTerm.toLowerCase());
+          (venue.venue_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (venue.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (venue.location || '').toLowerCase().includes(searchTerm.toLowerCase());
         
         const matchesVibe = selectedVibe === 'All' || (venue.vibe || 'Uncategorized') === selectedVibe;
         const matchesLocation = selectedLocation === 'All' || (venue.location?.trim() || 'Unknown') === selectedLocation;
         const matchesStatus = selectedStatus === 'All' || (venue.status || "Haven't looked") === selectedStatus;
         
-        const matchesCapacity = minCapacity === '' || venue.capacity >= parseInt(minCapacity);
-        const matchesPrice = maxPrice === '' || venue.booking_price <= parseInt(maxPrice);
+        const venueCapacity = venue.capacity || 0;
+        const venueCostPP = venue.total_cost_pp || 0;
+
+        const matchesCapacity = minCapacity === '' || venueCapacity >= parseInt(minCapacity);
+        const matchesPrice = maxPrice === '' || venueCostPP <= parseInt(maxPrice);
 
         return matchesSearch && matchesVibe && matchesLocation && matchesStatus && matchesCapacity && matchesPrice;
       })
       .sort((a, b) => {
+        const costA = a.total_cost_pp || 0;
+        const costB = b.total_cost_pp || 0;
+        const capA = a.capacity || 0;
+        const capB = b.capacity || 0;
+
         switch (sortOption) {
-          case 'price-asc': return a.booking_price - b.booking_price;
-          case 'price-desc': return b.booking_price - a.booking_price;
-          case 'capacity-desc': return b.capacity - a.capacity;
-          case 'name-asc': return a.venue_name.localeCompare(b.venue_name);
+          case 'total_pp-asc': return costA - costB;
+          case 'total_pp-desc': return costB - costA;
+          case 'capacity-desc': return capB - capA;
+          case 'name-asc': return (a.venue_name || '').localeCompare(b.venue_name || '');
           case 'status': {
              const order: Record<ConsiderationStatus, number> = { 'Priority': 0, 'Maybe': 1, "Haven't looked": 2, 'No': 3 };
              const statusA = a.status || "Haven't looked";
@@ -80,7 +83,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
     setSelectedStatus('All');
     setMinCapacity('');
     setMaxPrice('');
-    setSortOption('name-asc');
+    setSortOption('total_pp-desc');
   };
 
   const getStatusStyle = (status: ConsiderationStatus) => {
@@ -109,10 +112,8 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
 
   return (
     <div className="space-y-6">
-      {/* --- Search & Filter Toolbar --- */}
+      {/* Toolbar */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-wedding-200">
-        
-        {/* Top Row: Search & Toggle */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-4">
           <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-wedding-400" />
@@ -140,20 +141,18 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
                   className="w-full pl-9 pr-8 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none text-sm appearance-none cursor-pointer text-gray-700"
                 >
+                  <option value="total_pp-desc">Sort: PP Cost (High)</option>
+                  <option value="total_pp-asc">Sort: PP Cost (Low)</option>
                   <option value="name-asc">Sort: A-Z</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="capacity-desc">Capacity: Highest First</option>
-                  <option value="status">Status: Priority First</option>
+                  <option value="capacity-desc">Sort: Capacity</option>
+                  <option value="status">Sort: Status</option>
                 </select>
             </div>
           </div>
         </div>
 
-        {/* Filter Drawer */}
         {showFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-wedding-100 animate-fade-in">
-            
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Status</label>
               <select 
@@ -168,7 +167,6 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 <option value="No">No</option>
               </select>
             </div>
-
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Vibe</label>
               <select 
@@ -179,7 +177,6 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 {uniqueVibes.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Location</label>
               <select 
@@ -190,7 +187,6 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 {uniqueLocations.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
-
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Min Capacity</label>
               <input 
@@ -201,18 +197,16 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
               />
             </div>
-
             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Max Price</label>
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Max Total PP ($)</label>
               <input 
                 type="number" 
-                placeholder="e.g. 10000"
+                placeholder="e.g. 500"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
                 className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
               />
             </div>
-            
             <div className="col-span-1 sm:col-span-2 lg:col-span-5 flex justify-end">
               <button onClick={clearFilters} className="text-xs text-wedding-600 hover:text-wedding-800 underline">
                 Reset all filters
@@ -222,14 +216,13 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
         )}
       </div>
 
-      {/* --- Results Count --- */}
+      {/* Results */}
       <div className="flex justify-between items-center px-2">
         <p className="text-sm text-gray-500 italic">
           Showing {filteredAndSortedVenues.length} result{filteredAndSortedVenues.length !== 1 && 's'}
         </p>
       </div>
 
-      {/* --- Grid Results --- */}
       {filteredAndSortedVenues.length === 0 ? (
         <div className="text-center py-20 bg-white/50 rounded-xl border border-dashed border-wedding-300">
            <Search className="w-8 h-8 text-wedding-300 mx-auto mb-2" />
@@ -254,9 +247,12 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                   <div className="flex items-center text-wedding-600 text-sm mt-1">
                     <MapPin className="w-3 h-3 mr-1" />
                     {venue.location}
+                    <span className="mx-2 text-wedding-300">|</span>
+                    <span className="bg-white px-2 py-0.5 rounded text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide">
+                        {venue.vibe || 'Venue'}
+                    </span>
                   </div>
                 </div>
-                {/* STATUS DROPDOWN - TOP RIGHT */}
                 <div className="relative group/status" onClick={(e) => e.stopPropagation()}>
                   <select 
                       value={venue.status || "Haven't looked"}
@@ -272,48 +268,64 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 </div>
               </div>
               
-              <div className="p-5 space-y-4 flex-1">
-                {/* Vibe Tag */}
-                <div className="mb-2">
-                   <span className="inline-block bg-white px-2 py-0.5 rounded-md text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide">
-                    {venue.vibe || 'Venue'}
-                  </span>
+              <div className="p-5 space-y-5 flex-1 flex flex-col">
+                
+                {/* Financial Hero */}
+                <div className="bg-wedding-50/30 rounded-lg p-4 border border-wedding-100">
+                    <div className="flex justify-between items-baseline mb-3">
+                        <span className="text-xs font-bold text-wedding-500 uppercase tracking-widest">Total Cost / Person</span>
+                        <div className="text-3xl font-serif font-bold text-wedding-900">
+                            ${(venue.total_cost_pp || 0).toFixed(0)}
+                        </div>
+                    </div>
+                    {/* Breakdown */}
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs border-t border-wedding-100 pt-3">
+                        <div>
+                            <span className="block text-gray-500 mb-0.5">Welcome</span>
+                            <span className="font-bold text-gray-800">${venue.welcome_cost_pp || 0}</span>
+                        </div>
+                        <div className="border-l border-wedding-100">
+                            <span className="block text-gray-500 mb-0.5">Reception</span>
+                            <span className="font-bold text-gray-800">${venue.reception_cost_pp || 0}</span>
+                        </div>
+                        <div className="border-l border-wedding-100">
+                            <span className="block text-gray-500 mb-0.5">Brunch</span>
+                            <span className="font-bold text-gray-800">${venue.brunch_cost_pp || 0}</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-wedding-400 uppercase tracking-wider font-bold">Capacity</p>
-                    <div className="flex items-center text-gray-700 font-medium">
-                      <Users className="w-4 h-4 mr-2 text-wedding-500" />
-                      {venue.capacity} Guests
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-wedding-400 uppercase tracking-wider font-bold">Booking Cost</p>
-                    <div className="flex items-center text-gray-700 font-medium">
-                      <DollarSign className="w-4 h-4 mr-2 text-wedding-500" />
-                      ${venue.booking_price.toLocaleString()}
-                    </div>
-                  </div>
-                   <div className="space-y-1">
-                    <p className="text-xs text-wedding-400 uppercase tracking-wider font-bold">PP Cost</p>
-                    <div className="text-sm text-gray-700">
-                      ${venue.per_person_cost} / person
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-wedding-400 uppercase tracking-wider font-bold">Food & Bev</p>
-                    <div className="text-sm text-gray-700 truncate" title={venue.food_bev_cost}>
-                      {venue.food_bev_cost}
-                    </div>
-                  </div>
+                {/* Secondary Stats */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                   <div className="flex items-center gap-3 text-gray-700">
+                      <Users className="w-4 h-4 text-wedding-400" />
+                      <div className="flex flex-col">
+                          <span className="text-[10px] uppercase text-gray-400 font-bold">Capacity</span>
+                          <span className="font-medium">{venue.capacity || 0} Guests</span>
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-3 text-gray-700">
+                      <DollarSign className="w-4 h-4 text-wedding-400" />
+                      <div className="flex flex-col">
+                          <span className="text-[10px] uppercase text-gray-400 font-bold">Site Fee</span>
+                          <span className="font-medium">${(venue.site_fee || 0).toLocaleString()}</span>
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-3 text-gray-700">
+                      <Utensils className="w-4 h-4 text-wedding-400" />
+                      <div className="flex flex-col">
+                          <span className="text-[10px] uppercase text-gray-400 font-bold">F&B Minimum</span>
+                          <span className="font-medium">${(venue.food_bev_minimum || 0).toLocaleString()}</span>
+                      </div>
+                   </div>
                 </div>
 
+                {/* Notes Teaser */}
                 <div className="pt-4 border-t border-wedding-50 mt-auto">
                   <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-wedding-400 mt-1 flex-shrink-0" />
-                    <p className="text-sm text-gray-600 italic leading-relaxed line-clamp-3" title={venue.notes}>
-                      {venue.notes}
+                    <Info className="w-4 h-4 text-wedding-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-gray-600 italic leading-relaxed line-clamp-2" title={venue.notes}>
+                      {venue.notes || "No rate card notes available."}
                     </p>
                   </div>
                 </div>

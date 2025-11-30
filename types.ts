@@ -3,14 +3,25 @@ export interface Venue {
   id: string;
   venue_name: string;
   location: string;
-  capacity: number;
-  booking_price: number; // Normalized to number for charts
-  per_person_cost: number;
-  food_bev_cost: string;
-  admin_fees: string;
   vibe: string;
-  notes: string;
+  capacity: number;
   status: ConsiderationStatus;
+  
+  // New Financial Schema
+  booking_cost: number; // General estimate or Base cost
+  admin_fees: string; // e.g. "25% admin + 8% tax"
+  notes: string; // Rate card details
+  
+  site_fee: number;
+  site_fee_notes: string;
+  food_bev_minimum: number;
+  
+  welcome_cost_pp: number;
+  brunch_cost_pp: number;
+  reception_cost_pp: number;
+  total_cost_pp: number; // Calculated sum
+
+  // Tracking
   lastUpdated?: number;
   updateDescription?: string;
 }

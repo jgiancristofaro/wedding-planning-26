@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Venue, Vendor } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
@@ -10,7 +11,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ venues, vendors }) => {
   const venueData = venues.map(v => ({
     name: v.venue_name,
-    cost: v.booking_price,
+    cost: v.booking_cost, // Updated to use booking_cost
     capacity: v.capacity
   }));
 
@@ -24,7 +25,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ venues, vendors }) => {
     return acc;
   }, [] as { name: string; value: number }[]);
 
-  const totalBudget = venues.reduce((acc, v) => acc + v.booking_price, 0) + vendors.reduce((acc, v) => acc + v.price, 0);
+  const totalBudget = venues.reduce((acc, v) => acc + v.booking_cost, 0) + vendors.reduce((acc, v) => acc + v.price, 0);
   const COLORS = ['#bfa094', '#a18072', '#e0cec7', '#d4af37', '#5e4b42'];
 
   return (

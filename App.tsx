@@ -160,22 +160,32 @@ const App: React.FC = () => {
         const existing = newVenues[existingIndex];
         const changes: string[] = [];
 
-        // Check for key field changes
-        if (extracted.booking_price > 0 && extracted.booking_price !== existing.booking_price) {
-            changes.push(`Price changed from $${existing.booking_price} to $${extracted.booking_price}`);
+        // Check for key field changes (New Schema)
+        const existingTotalPP = existing.total_cost_pp || 0;
+        if (extracted.total_cost_pp > 0 && extracted.total_cost_pp !== existingTotalPP) {
+            changes.push(`Total PP Cost updated from $${existingTotalPP} to $${extracted.total_cost_pp}`);
         }
-        if (extracted.capacity > 0 && extracted.capacity !== existing.capacity) {
-            changes.push(`Capacity changed from ${existing.capacity} to ${extracted.capacity}`);
+        
+        const existingSiteFee = existing.site_fee || 0;
+        if (extracted.site_fee > 0 && extracted.site_fee !== existingSiteFee) {
+            changes.push(`Site Fee updated from $${existingSiteFee} to $${extracted.site_fee}`);
         }
-        if (extracted.notes && extracted.notes.length > existing.notes.length + 10) {
-             changes.push("Notes significantly updated");
+        
+        const existingCapacity = existing.capacity || 0;
+        if (extracted.capacity > 0 && extracted.capacity !== existingCapacity) {
+            changes.push(`Capacity changed from ${existingCapacity} to ${extracted.capacity}`);
+        }
+        
+        if (extracted.notes && existing.notes && extracted.notes.length !== existing.notes.length) {
+             changes.push("Rate card notes updated");
         }
 
         newVenues[existingIndex] = {
           ...existing,
           ...extracted,
+          // Preserve existing text if new extraction is empty/poor, otherwise overwrite
           notes: extracted.notes || existing.notes,
-          booking_price: extracted.booking_price || existing.booking_price,
+          
           status: existing.status || "Haven't looked",
           // Update timestamp only if changes detected
           lastUpdated: changes.length > 0 ? timestamp : existing.lastUpdated,
@@ -280,13 +290,28 @@ const App: React.FC = () => {
 
     if (type === 'venues') {
       headers = [
-        'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Price', 
-        'Per Person Cost', 'Food & Bev', 'Admin Fees', 'Vibe', 'Notes'
+        'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Cost', 
+        'Site Fee', 'Site Fee Notes', 'F&B Minimum', 'Admin Fees',
+        'Welcome Cost/pp', 'Reception Cost/pp', 'Brunch Cost/pp', 'Total Cost/pp',
+        'Vibe', 'Notes'
       ];
       
       rows = (data as Venue[]).map(v => [
-        v.venue_name, v.status || "Haven't looked", v.location, v.capacity, v.booking_price,
-        v.per_person_cost, v.food_bev_cost, v.admin_fees, v.vibe, v.notes
+        v.venue_name, 
+        v.status || "Haven't looked", 
+        v.location, 
+        v.capacity, 
+        v.booking_cost,
+        v.site_fee,
+        v.site_fee_notes,
+        v.food_bev_minimum,
+        v.admin_fees,
+        v.welcome_cost_pp,
+        v.reception_cost_pp,
+        v.brunch_cost_pp,
+        v.total_cost_pp,
+        v.vibe, 
+        v.notes
       ].map(formatValue).join(','));
 
     } else {
@@ -414,7 +439,7 @@ const App: React.FC = () => {
               <div className="flex justify-between items-end mb-6">
                 <div>
                   <h2 className="text-2xl font-serif font-bold text-wedding-900">Venue Organizer</h2>
-                  <p className="text-wedding-600 mt-1">Manage and compare your potential wedding locations.</p>
+                  <p className="text-wedding-600 mt-1">Manage financial breakdowns and rate cards.</p>
                 </div>
                 <button 
                   onClick={() => setIsAddVenueModalOpen(true)}

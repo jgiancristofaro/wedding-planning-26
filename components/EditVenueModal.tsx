@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Venue } from '../types';
 import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Info } from 'lucide-react';
@@ -130,30 +129,30 @@ export const EditVenueModal: React.FC<EditVenueModalProps> = ({ venue, isOpen, o
                 <label className="text-xs font-bold text-wedding-700 uppercase tracking-wider">Booking Cost ($)</label>
                 <input
                   type="number"
-                  value={formData.booking_price}
-                  onChange={(e) => handleChange('booking_price', parseFloat(e.target.value) || 0)}
+                  value={formData.booking_cost}
+                  onChange={(e) => handleChange('booking_cost', parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-wedding-700 uppercase tracking-wider">Per Person Cost ($)</label>
+                <label className="text-xs font-bold text-wedding-700 uppercase tracking-wider">Total Per Person Cost ($)</label>
                 <input
                   type="number"
-                  value={formData.per_person_cost}
-                  onChange={(e) => handleChange('per_person_cost', parseFloat(e.target.value) || 0)}
+                  value={formData.total_cost_pp}
+                  onChange={(e) => handleChange('total_cost_pp', parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
                 />
               </div>
               
               <div className="space-y-1">
-                <label className="text-xs font-bold text-wedding-700 uppercase tracking-wider">Food & Bev Info</label>
+                <label className="text-xs font-bold text-wedding-700 uppercase tracking-wider">F&B Minimum ($)</label>
                 <input
-                  type="text"
-                  value={formData.food_bev_cost}
-                  onChange={(e) => handleChange('food_bev_cost', e.target.value)}
+                  type="number"
+                  value={formData.food_bev_minimum}
+                  onChange={(e) => handleChange('food_bev_minimum', parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
-                  placeholder="e.g. Included, External Catering"
+                  placeholder="0"
                 />
               </div>
 

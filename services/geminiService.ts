@@ -57,15 +57,20 @@ const venueSchema = {
     properties: {
       venue_name: { type: Type.STRING },
       location: { type: Type.STRING },
-      capacity: { type: Type.INTEGER },
-      booking_price: { type: Type.NUMBER, description: "Base rental cost normalized to a number" },
-      per_person_cost: { type: Type.NUMBER, description: "Cost per person normalized to a number" },
-      food_bev_cost: { type: Type.STRING },
-      admin_fees: { type: Type.STRING },
       vibe: { type: Type.STRING },
-      notes: { type: Type.STRING },
+      capacity: { type: Type.INTEGER, description: "If multiple options, use MAXIMUM capacity." },
+      booking_cost: { type: Type.NUMBER, description: "Total estimated booking cost if available, else 0" },
+      admin_fees: { type: Type.STRING, description: "e.g., '25% admin + 8% tax'" },
+      notes: { type: Type.STRING, description: "Rate Card summary (e.g. 'Site fee: $50k, Min guarantee: $60k')" },
+      site_fee: { type: Type.NUMBER },
+      site_fee_notes: { type: Type.STRING, description: "1 sentence on inclusions" },
+      food_bev_minimum: { type: Type.NUMBER },
+      welcome_cost_pp: { type: Type.NUMBER, description: "Cost for 4-hour premium open bar/food" },
+      brunch_cost_pp: { type: Type.NUMBER, description: "Cost per person for brunch" },
+      reception_cost_pp: { type: Type.NUMBER, description: "Dinner + 4-hour premium open bar" },
+      total_cost_pp: { type: Type.NUMBER, description: "Sum of welcome, brunch, and reception costs" },
     },
-    required: ["venue_name", "location", "booking_price"],
+    required: ["venue_name", "location", "total_cost_pp"],
   }
 };
 
@@ -93,12 +98,25 @@ export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id' | '
   const ai = new GoogleGenAI({ apiKey });
   let parts = [];
 
+  const promptText = `
+    You are a wedding planner assistant. Extract details for ALL venues found in this document. 
+    Return a JSON array of venues. Normalize all prices to numbers.
+    
+    CRITICAL INSTRUCTIONS:
+    1. For Capacity: If multiple options exist, use the MAXIMUM capacity available.
+    2. For Costs: If prices vary by date, assume the wedding is in DECEMBER.
+    3. For Notes: Create a 'Rate Card' summary (e.g., 'Site fee: $50k, Min guarantee: $60k').
+    4. For Welcome Dinner: Look for costs associated with a 4-hour premium open bar.
+    5. For Reception: Look for costs associated with dinner + 4-hour premium open bar.
+    6. Calculate 'total_cost_pp' as the sum of reception, brunch, and welcome costs. Calculate this based on your extracted values.
+  `;
+
   if (isExcelFile(file)) {
     const csvData = await excelToCsv(file);
     parts = [
       { text: "Here is data from an uploaded Excel file (converted to CSV):" },
       { text: csvData },
-      { text: "You are a wedding planner assistant. Extract details for ALL venues found in this data. Return a JSON array of venues. If specific numeric values are missing, estimate or use 0. Normalize prices to numbers." }
+      { text: promptText }
     ];
   } else {
     const base64Data = await fileToBase64(file);
@@ -111,7 +129,7 @@ export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id' | '
         },
       },
       {
-        text: "You are a wedding planner assistant. Extract details for ALL venues found in this document. Return a JSON array of venues. If specific numeric values are missing, estimate or use 0. Normalize prices to numbers.",
+        text: promptText,
       },
     ];
   }
