@@ -234,3 +234,57 @@ export const findVenueUrl = async (venueName: string, location: string): Promise
     return null;
   }
 };
+
+// Auto-Fill Venue Details Feature
+export const enrichVenueDetails = async (venueName: string, location: string): Promise<{
+  website_url?: string;
+  location?: string;
+  capacity?: number;
+  vibe?: string;
+} | null> => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const locationContext = location ? `in '${location}'` : '';
+  const prompt = `Search for the wedding venue '${venueName}' ${locationContext}. 
+Find the following details:
+1. Official Website URL
+2. Full Street Address
+3. Maximum Guest Capacity
+4. Vibe/Style (e.g. Modern, Rustic, Garden, etc.)
+
+Return the result as a VALID JSON object with the keys: "website_url", "location" (full address), "capacity" (number), and "vibe".
+Do not include Markdown formatting.
+If a value is not found, set it to null.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      }
+    });
+
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      const jsonStr = jsonMatch[0];
+      const json = JSON.parse(jsonStr);
+      return {
+        website_url: json.website_url || undefined,
+        location: json.location || undefined,
+        capacity: typeof json.capacity === 'number' ? json.capacity : (parseInt(json.capacity) || undefined),
+        vibe: json.vibe || undefined
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Enrichment Error:", error);
+    return null;
+  }
+};

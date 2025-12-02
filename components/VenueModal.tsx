@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator, Globe } from 'lucide-react';
+import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator, Globe, Sparkles, Loader2 } from 'lucide-react';
+import { enrichVenueDetails } from '../services/geminiService';
 
 interface VenueModalProps {
   venue?: Venue | null;
@@ -34,6 +35,7 @@ const DEFAULT_VENUE: Omit<Venue, 'id'> = {
 export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, onSave, onDelete }) => {
   const [formData, setFormData] = useState<Omit<Venue, 'id'>>(DEFAULT_VENUE);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   useEffect(() => {
     if (venue) {
@@ -69,6 +71,32 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
 
   const handleChange = (field: keyof Omit<Venue, 'id'>, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAutoFill = async () => {
+    if (!formData.venue_name) return;
+    
+    setIsEnriching(true);
+    try {
+      const enriched = await enrichVenueDetails(formData.venue_name, formData.location);
+      if (enriched) {
+        setFormData(prev => ({
+          ...prev,
+          // Prioritize new URL if current is empty
+          website_url: prev.website_url || enriched.website_url || '',
+          // Update location to full address if enriched is longer/better, otherwise keep existing
+          location: (enriched.location && enriched.location.length > (prev.location || '').length) ? enriched.location : (prev.location || enriched.location || ''),
+          // Fill capacity if missing
+          capacity: prev.capacity || enriched.capacity || 0,
+          // Fill vibe if missing
+          vibe: prev.vibe || enriched.vibe || ''
+        }));
+      }
+    } catch (error) {
+      console.error("Auto-fill failed", error);
+    } finally {
+      setIsEnriching(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -110,7 +138,20 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
             
             {/* 1. General Info */}
             <section className="space-y-4">
-              <h3 className="text-sm font-bold text-wedding-500 uppercase tracking-widest border-b border-wedding-100 pb-2 mb-4">General Information</h3>
+              <div className="flex justify-between items-center border-b border-wedding-100 pb-2 mb-4">
+                <h3 className="text-sm font-bold text-wedding-500 uppercase tracking-widest">General Information</h3>
+                <button
+                  type="button"
+                  onClick={handleAutoFill}
+                  disabled={!formData.venue_name || isEnriching}
+                  className="text-xs font-bold text-wedding-600 hover:text-wedding-800 flex items-center gap-1.5 bg-wedding-50 px-3 py-1 rounded-full border border-wedding-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Search Google for address, capacity, and vibe"
+                >
+                  {isEnriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-gold-500 fill-gold-400" />}
+                  {isEnriching ? 'Searching...' : '✨ Auto-Fill Details'}
+                </button>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-wedding-700">Venue Name</label>
@@ -119,6 +160,7 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                     value={formData.venue_name}
                     onChange={(e) => handleChange('venue_name', e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                    placeholder="e.g. The Grand Hotel"
                     required
                   />
                 </div>
@@ -131,6 +173,7 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                       value={formData.location}
                       onChange={(e) => handleChange('location', e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                      placeholder="e.g. Napa Valley, CA"
                     />
                   </div>
                 </div>
