@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator } from 'lucide-react';
+import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator, Globe } from 'lucide-react';
 
 interface VenueModalProps {
   venue?: Venue | null;
@@ -28,6 +28,7 @@ const DEFAULT_VENUE: Omit<Venue, 'id'> = {
   reception_cost_pp: 0,
   cocktail_cost_pp: 0,
   total_cost_pp: 0,
+  website_url: '',
 };
 
 export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, onSave, onDelete }) => {
@@ -41,7 +42,8 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
       setFormData({
         ...DEFAULT_VENUE,
         ...rest,
-        cocktail_cost_pp: rest.cocktail_cost_pp || 0
+        cocktail_cost_pp: rest.cocktail_cost_pp || 0,
+        website_url: rest.website_url || ''
       });
     } else {
       setFormData(DEFAULT_VENUE);
@@ -129,6 +131,19 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                       value={formData.location}
                       onChange={(e) => handleChange('location', e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-wedding-700">Website URL</label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.website_url || ''}
+                      onChange={(e) => handleChange('website_url', e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                      placeholder="https://www.example.com"
                     />
                   </div>
                 </div>
