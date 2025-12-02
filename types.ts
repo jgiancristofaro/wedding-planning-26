@@ -22,6 +22,8 @@ export interface Venue {
   cocktail_cost_pp?: number; // New field for Cocktail Hour
   total_cost_pp: number; // Calculated sum
 
+  website_url?: string; // New Magic Search field
+
   // Tracking
   lastUpdated?: number;
   updateDescription?: string;

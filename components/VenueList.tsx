@@ -1,18 +1,19 @@
 
 import React, { useState, useMemo } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2, Utensils } from 'lucide-react';
+import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2, Utensils, Sparkles, Globe, ExternalLink, Loader2 } from 'lucide-react';
 import { VenueModal } from './VenueModal';
 
 interface VenueListProps {
   venues: Venue[];
   onUpdateVenue: (venue: Venue) => void;
   onDeleteVenue: (venueId: string) => void;
+  onEnrichVenue: (venueId: string) => Promise<void>;
 }
 
 type SortOption = 'total_pp-asc' | 'total_pp-desc' | 'capacity-desc' | 'name-asc' | 'status';
 
-export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onDeleteVenue }) => {
+export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onDeleteVenue, onEnrichVenue }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVibe, setSelectedVibe] = useState<string>('All');
   const [selectedLocation, setSelectedLocation] = useState<string>('All');
@@ -23,6 +24,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
   const [showFilters, setShowFilters] = useState(false);
   
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
 
   const uniqueVibes = useMemo(() => {
     const vibes = new Set(venues.map(v => v.vibe || 'Uncategorized'));
@@ -100,6 +102,13 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
       onUpdateVenue({ ...updatedData, id: editingVenue.id });
       setEditingVenue(null);
     }
+  };
+
+  const handleMagicSearch = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setEnrichingId(id);
+    await onEnrichVenue(id);
+    setEnrichingId(null);
   };
 
   if (venues.length === 0) {
@@ -244,13 +253,42 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                     <h3 className="font-serif text-xl font-bold text-wedding-900 group-hover:text-wedding-700 transition-colors">{venue.venue_name}</h3>
                     <Edit2 className="w-3 h-3 text-wedding-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <div className="flex items-center text-wedding-600 text-sm mt-1">
+                  <div className="flex items-center text-wedding-600 text-sm mt-1 flex-wrap gap-y-2">
                     <MapPin className="w-3 h-3 mr-1" />
                     {venue.location}
-                    <span className="mx-2 text-wedding-300">|</span>
-                    <span className="bg-white px-2 py-0.5 rounded text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide">
+                    <span className="mx-2 text-wedding-300 hidden sm:inline">|</span>
+                    <span className="bg-white px-2 py-0.5 rounded text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide mr-2">
                         {venue.vibe || 'Venue'}
                     </span>
+                    
+                    {/* Magic Search / URL Display */}
+                    {venue.website_url ? (
+                      <a 
+                        href={venue.website_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors"
+                      >
+                        <Globe className="w-3 h-3" />
+                        Website
+                        <ExternalLink className="w-2 h-2 ml-0.5" />
+                      </a>
+                    ) : (
+                      <button
+                        onClick={(e) => handleMagicSearch(e, venue.id)}
+                        disabled={enrichingId === venue.id}
+                        className="flex items-center gap-1 text-[10px] font-bold text-wedding-600 bg-white px-2 py-0.5 rounded border border-wedding-300 hover:bg-wedding-100 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-wait"
+                        title="Use AI to find the official website"
+                      >
+                        {enrichingId === venue.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-wedding-500" />
+                        ) : (
+                          <Sparkles className="w-3 h-3 text-gold-500 fill-gold-400" />
+                        )}
+                        {enrichingId === venue.id ? 'Searching...' : 'Find URL'}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="relative group/status" onClick={(e) => e.stopPropagation()}>

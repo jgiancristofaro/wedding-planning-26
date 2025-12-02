@@ -9,7 +9,7 @@ import { Settings } from './components/Settings';
 import { RecentUpdates } from './components/RecentUpdates';
 import { VenueModal } from './components/VenueModal';
 import { Venue, Vendor, Tab, INITIAL_STATE, AppState, SyncConfig } from './types';
-import { extractVenueData, extractVendorData } from './services/geminiService';
+import { extractVenueData, extractVendorData, findVenueUrl } from './services/geminiService';
 import { initSync, startAutoSync, saveDataToCloud, verifyConnection, fetchFromCloud } from './services/storageService';
 import { LayoutDashboard, MapPin, Users, Download, Trash2, Settings as SettingsIcon, Plus, History } from 'lucide-react';
 import { APP_CONFIG } from './config';
@@ -233,6 +233,31 @@ const App: React.FC = () => {
     updateData({ ...state, venues: newVenues });
   };
 
+  const handleEnrichVenue = async (venueId: string) => {
+    const venue = state.venues.find(v => v.id === venueId);
+    if (!venue) return;
+
+    try {
+      const url = await findVenueUrl(venue.venue_name, venue.location);
+      if (url) {
+        const updatedVenue = {
+            ...venue,
+            website_url: url,
+            lastUpdated: Date.now(),
+            updateDescription: 'Website URL added via Magic Search'
+        };
+        // Update state directly without trigger manual update timestamp if we handled it above
+        const newVenues = state.venues.map(v => v.id === updatedVenue.id ? updatedVenue : v);
+        updateData({ ...state, venues: newVenues });
+      } else {
+        alert("Could not find a definitive official website for this venue.");
+      }
+    } catch (error) {
+      console.error("Magic search failed", error);
+      alert("Magic search failed. Please try again later.");
+    }
+  };
+
   // --- VENDOR HANDLERS ---
 
   const handleVendorComplete = (newVendorsData: Omit<Vendor, 'id' | 'status'>[]) => {
@@ -298,7 +323,7 @@ const App: React.FC = () => {
         'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Cost', 
         'Site Fee', 'Site Fee Notes', 'F&B Minimum', 'Admin Fees',
         'Welcome Cost/pp', 'Cocktail Hour Cost/pp', 'Reception Cost/pp', 'Brunch Cost/pp', 'Total Cost/pp',
-        'Vibe', 'Notes'
+        'Vibe', 'Notes', 'Website'
       ];
       
       rows = (data as Venue[]).map(v => [
@@ -312,12 +337,13 @@ const App: React.FC = () => {
         v.food_bev_minimum,
         v.admin_fees,
         v.welcome_cost_pp,
-        v.cocktail_cost_pp, // Added new field
+        v.cocktail_cost_pp,
         v.reception_cost_pp,
         v.brunch_cost_pp,
         v.total_cost_pp,
         v.vibe, 
-        v.notes
+        v.notes,
+        v.website_url
       ].map(formatValue).join(','));
 
     } else {
@@ -466,6 +492,7 @@ const App: React.FC = () => {
                 venues={state.venues} 
                 onUpdateVenue={handleVenueUpdate} 
                 onDeleteVenue={handleDeleteVenue}
+                onEnrichVenue={handleEnrichVenue}
               />
               
               <VenueModal

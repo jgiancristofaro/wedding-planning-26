@@ -193,3 +193,44 @@ export const extractVendorData = async (file: File): Promise<Omit<Vendor, 'id' |
   if (!response.text) throw new Error("No data extracted from the Gemini API.");
   return JSON.parse(response.text);
 };
+
+// Magic Search Feature
+export const findVenueUrl = async (venueName: string, location: string): Promise<string | null> => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    // Fail gracefully if no key is present in client
+    console.error("Gemini API Key is missing.");
+    return null;
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `Find the official website URL for the wedding venue '${venueName}' located in '${location}'. Return ONLY a JSON object with the key 'url'. If you cannot find a definitive official website, return { "url": null }. Example output: { "url": "https://www.example.com" }`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      }
+    });
+
+    const text = response.text || "";
+    
+    // Attempt to extract JSON from the text response
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    
+    if (start !== -1 && end !== -1) {
+      const jsonStr = text.substring(start, end + 1);
+      const json = JSON.parse(jsonStr);
+      return json.url || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Magic Search Error:", error);
+    return null;
+  }
+};
