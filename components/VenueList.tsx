@@ -27,8 +27,10 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
 
   const uniqueVibes = useMemo(() => {
-    const vibes = new Set(venues.map(v => v.vibe || 'Uncategorized'));
-    return ['All', ...Array.from(vibes).sort()];
+    // Flatten all vibe arrays from all venues
+    const allVibes = venues.flatMap(v => Array.isArray(v.vibe) ? v.vibe : []);
+    const unique = new Set(allVibes);
+    return ['All', ...Array.from(unique).sort()];
   }, [venues]);
 
   const uniqueLocations = useMemo(() => {
@@ -44,7 +46,10 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
           (venue.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
           (venue.location || '').toLowerCase().includes(searchTerm.toLowerCase());
         
-        const matchesVibe = selectedVibe === 'All' || (venue.vibe || 'Uncategorized') === selectedVibe;
+        // Vibe match: check if the array includes the selected vibe
+        const venueVibes = Array.isArray(venue.vibe) ? venue.vibe : [];
+        const matchesVibe = selectedVibe === 'All' || venueVibes.includes(selectedVibe);
+        
         const matchesLocation = selectedLocation === 'All' || (venue.location?.trim() || 'Unknown') === selectedLocation;
         const matchesStatus = selectedStatus === 'All' || (venue.status || "Haven't looked") === selectedStatus;
         
@@ -177,7 +182,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Vibe</label>
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Vibe (Tag)</label>
               <select 
                 value={selectedVibe} 
                 onChange={(e) => setSelectedVibe(e.target.value)}
@@ -253,22 +258,36 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                     <h3 className="font-serif text-xl font-bold text-wedding-900 group-hover:text-wedding-700 transition-colors">{venue.venue_name}</h3>
                     <Edit2 className="w-3 h-3 text-wedding-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <div className="flex items-center text-wedding-600 text-sm mt-1 flex-wrap gap-y-2">
-                    <MapPin className="w-3 h-3 mr-1" />
-                    {venue.location}
-                    <span className="mx-2 text-wedding-300 hidden sm:inline">|</span>
-                    <span className="bg-white px-2 py-0.5 rounded text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide mr-2">
-                        {venue.vibe || 'Venue'}
-                    </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center text-wedding-600 text-sm mt-1 gap-y-2">
+                    <div className="flex items-center mr-3">
+                       <MapPin className="w-3 h-3 mr-1" />
+                       {venue.location}
+                    </div>
                     
-                    {/* Magic Search / URL Display */}
+                    <div className="flex flex-wrap gap-1">
+                      {Array.isArray(venue.vibe) && venue.vibe.length > 0 ? (
+                        venue.vibe.map((tag, idx) => (
+                          <span key={idx} className="bg-white px-2 py-0.5 rounded text-[10px] font-bold text-wedding-500 border border-wedding-200 uppercase tracking-wide">
+                              {tag}
+                          </span>
+                        ))
+                      ) : (
+                         <span className="bg-white px-2 py-0.5 rounded text-[10px] font-bold text-wedding-400 border border-wedding-200 uppercase tracking-wide italic">
+                            No Tags
+                         </span>
+                      )}
+                    </div>
+                  </div>
+                    
+                  {/* Magic Search / URL Display */}
+                  <div className="mt-2">
                     {venue.website_url ? (
                       <a 
                         href={venue.website_url} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 hover:bg-blue-100 transition-colors"
                       >
                         <Globe className="w-3 h-3" />
                         Website
@@ -278,7 +297,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                       <button
                         onClick={(e) => handleMagicSearch(e, venue.id)}
                         disabled={enrichingId === venue.id}
-                        className="flex items-center gap-1 text-[10px] font-bold text-wedding-600 bg-white px-2 py-0.5 rounded border border-wedding-300 hover:bg-wedding-100 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-wait"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-wedding-600 bg-white px-2 py-0.5 rounded border border-wedding-300 hover:bg-wedding-100 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-wait"
                         title="Use AI to find the official website"
                       >
                         {enrichingId === venue.id ? (

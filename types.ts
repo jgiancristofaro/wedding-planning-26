@@ -3,7 +3,7 @@ export interface Venue {
   id: string;
   venue_name: string;
   location: string;
-  vibe: string;
+  vibe: string[]; // Changed to Array of Tags
   capacity: number;
   status: ConsiderationStatus;
   

@@ -15,7 +15,7 @@ interface VenueModalProps {
 const DEFAULT_VENUE: Omit<Venue, 'id'> = {
   venue_name: '',
   location: '',
-  vibe: '',
+  vibe: [], // Initialized as array
   capacity: 0,
   status: "Haven't looked",
   booking_cost: 0,
@@ -34,6 +34,7 @@ const DEFAULT_VENUE: Omit<Venue, 'id'> = {
 
 export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, onSave, onDelete }) => {
   const [formData, setFormData] = useState<Omit<Venue, 'id'>>(DEFAULT_VENUE);
+  const [vibeInput, setVibeInput] = useState(''); // Local state for text input of tags
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
 
@@ -47,8 +48,11 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
         cocktail_cost_pp: rest.cocktail_cost_pp || 0,
         website_url: rest.website_url || ''
       });
+      // Convert array to string for editing
+      setVibeInput(Array.isArray(rest.vibe) ? rest.vibe.join(', ') : (rest.vibe || ''));
     } else {
       setFormData(DEFAULT_VENUE);
+      setVibeInput('');
     }
     setShowDeleteConfirm(false);
   }, [venue, isOpen]);
@@ -69,7 +73,7 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
 
   if (!isOpen) return null;
 
-  const handleChange = (field: keyof Omit<Venue, 'id'>, value: string | number) => {
+  const handleChange = (field: keyof Omit<Venue, 'id'>, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -88,9 +92,14 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
           location: (enriched.location && enriched.location.length > (prev.location || '').length) ? enriched.location : (prev.location || enriched.location || ''),
           // Fill capacity if missing
           capacity: prev.capacity || enriched.capacity || 0,
-          // Fill vibe if missing
-          vibe: prev.vibe || enriched.vibe || ''
+          // Fill vibe if missing, note: we update vibeInput below
+          vibe: (prev.vibe && prev.vibe.length > 0) ? prev.vibe : (enriched.vibe || [])
         }));
+
+        // Update the input field if the current input is empty and we found new tags
+        if (!vibeInput && enriched.vibe && enriched.vibe.length > 0) {
+           setVibeInput(enriched.vibe.join(', '));
+        }
       }
     } catch (error) {
       console.error("Auto-fill failed", error);
@@ -101,7 +110,15 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Process vibeInput into array of capitalized strings
+    const vibeArray = vibeInput
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1));
+
+    onSave({ ...formData, vibe: vibeArray });
     onClose();
   };
 
@@ -191,14 +208,15 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-wedding-700">Vibe</label>
+                  <label className="text-xs font-bold text-wedding-700">Vibe Tags (comma separated)</label>
                   <div className="relative">
                     <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
-                      value={formData.vibe}
-                      onChange={(e) => handleChange('vibe', e.target.value)}
+                      value={vibeInput}
+                      onChange={(e) => setVibeInput(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                      placeholder="e.g. Modern, Rustic, Outdoor"
                     />
                   </div>
                 </div>

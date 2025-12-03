@@ -22,7 +22,17 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('wedding_planner_data');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsedState = JSON.parse(saved);
+        
+        // MIGRATION: Convert 'vibe' string to string[] if needed
+        if (parsedState.venues) {
+          parsedState.venues = parsedState.venues.map((v: any) => ({
+            ...v,
+            vibe: Array.isArray(v.vibe) ? v.vibe : (v.vibe && typeof v.vibe === 'string' ? v.vibe.split(',').map((s: string) => s.trim()).filter(Boolean) : [])
+          }));
+        }
+        
+        return parsedState;
       } catch (e) {
         console.error("Failed to parse saved state", e);
       }
@@ -93,8 +103,18 @@ const App: React.FC = () => {
     if (isCloudConnected) {
       const stopSync = startAutoSync((remoteData) => {
         console.log("Remote changes detected, updating local state...");
-        setState(remoteData); 
-        localStorage.setItem('wedding_planner_data', JSON.stringify(remoteData));
+        
+        // Apply migration to remote data as well if needed
+        const migratedData = {
+           ...remoteData,
+           venues: remoteData.venues.map((v: any) => ({
+             ...v,
+             vibe: Array.isArray(v.vibe) ? v.vibe : (v.vibe && typeof v.vibe === 'string' ? v.vibe.split(',').map((s: string) => s.trim()).filter(Boolean) : [])
+           }))
+        };
+
+        setState(migratedData); 
+        localStorage.setItem('wedding_planner_data', JSON.stringify(migratedData));
         setLastSynced(new Date());
         setSyncStatus('saved');
       });
@@ -131,8 +151,15 @@ const App: React.FC = () => {
     try {
       const data = await fetchFromCloud();
       if (data) {
-        setState(data);
-        localStorage.setItem('wedding_planner_data', JSON.stringify(data));
+        const migratedData = {
+           ...data,
+           venues: data.venues.map((v: any) => ({
+             ...v,
+             vibe: Array.isArray(v.vibe) ? v.vibe : (v.vibe && typeof v.vibe === 'string' ? v.vibe.split(',').map((s: string) => s.trim()).filter(Boolean) : [])
+           }))
+        };
+        setState(migratedData);
+        localStorage.setItem('wedding_planner_data', JSON.stringify(migratedData));
         setLastSynced(new Date());
         setSyncStatus('saved');
         setTimeout(() => setSyncStatus('idle'), 3000);
@@ -156,40 +183,47 @@ const App: React.FC = () => {
         v => v.venue_name.toLowerCase() === extracted.venue_name.toLowerCase()
       );
 
+      // Ensure extracted vibe is array
+      const normalizedVibe = Array.isArray(extracted.vibe) 
+         ? extracted.vibe 
+         : (typeof extracted.vibe === 'string' ? (extracted.vibe as string).split(',').map((s: string) => s.trim()) : []);
+
+      const safeExtracted = { ...extracted, vibe: normalizedVibe };
+
       if (existingIndex >= 0) {
         const existing = newVenues[existingIndex];
         const changes: string[] = [];
 
         // Check for key field changes (New Schema)
         const existingTotalPP = existing.total_cost_pp || 0;
-        if (extracted.total_cost_pp > 0 && extracted.total_cost_pp !== existingTotalPP) {
-            changes.push(`Total PP Cost updated from $${existingTotalPP} to $${extracted.total_cost_pp}`);
+        if (safeExtracted.total_cost_pp > 0 && safeExtracted.total_cost_pp !== existingTotalPP) {
+            changes.push(`Total PP Cost updated from $${existingTotalPP} to $${safeExtracted.total_cost_pp}`);
         }
         
         const existingCocktail = existing.cocktail_cost_pp || 0;
-        if (extracted.cocktail_cost_pp && extracted.cocktail_cost_pp !== existingCocktail) {
-            changes.push(`Cocktail Cost updated from $${existingCocktail} to $${extracted.cocktail_cost_pp}`);
+        if (safeExtracted.cocktail_cost_pp && safeExtracted.cocktail_cost_pp !== existingCocktail) {
+            changes.push(`Cocktail Cost updated from $${existingCocktail} to $${safeExtracted.cocktail_cost_pp}`);
         }
         
         const existingSiteFee = existing.site_fee || 0;
-        if (extracted.site_fee > 0 && extracted.site_fee !== existingSiteFee) {
-            changes.push(`Site Fee updated from $${existingSiteFee} to $${extracted.site_fee}`);
+        if (safeExtracted.site_fee > 0 && safeExtracted.site_fee !== existingSiteFee) {
+            changes.push(`Site Fee updated from $${existingSiteFee} to $${safeExtracted.site_fee}`);
         }
         
         const existingCapacity = existing.capacity || 0;
-        if (extracted.capacity > 0 && extracted.capacity !== existingCapacity) {
-            changes.push(`Capacity changed from ${existingCapacity} to ${extracted.capacity}`);
+        if (safeExtracted.capacity > 0 && safeExtracted.capacity !== existingCapacity) {
+            changes.push(`Capacity changed from ${existingCapacity} to ${safeExtracted.capacity}`);
         }
         
-        if (extracted.notes && existing.notes && extracted.notes.length !== existing.notes.length) {
+        if (safeExtracted.notes && existing.notes && safeExtracted.notes.length !== existing.notes.length) {
              changes.push("Rate card notes updated");
         }
 
         newVenues[existingIndex] = {
           ...existing,
-          ...extracted,
+          ...safeExtracted,
           // Preserve existing text if new extraction is empty/poor, otherwise overwrite
-          notes: extracted.notes || existing.notes,
+          notes: safeExtracted.notes || existing.notes,
           
           status: existing.status || "Haven't looked",
           // Update timestamp only if changes detected
@@ -198,7 +232,7 @@ const App: React.FC = () => {
         };
       } else {
         newVenues.push({ 
-          ...extracted, 
+          ...safeExtracted, 
           id: crypto.randomUUID(),
           status: "Haven't looked",
           lastUpdated: timestamp,
@@ -323,7 +357,7 @@ const App: React.FC = () => {
         'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Cost', 
         'Site Fee', 'Site Fee Notes', 'F&B Minimum', 'Admin Fees',
         'Welcome Cost/pp', 'Cocktail Hour Cost/pp', 'Reception Cost/pp', 'Brunch Cost/pp', 'Total Cost/pp',
-        'Vibe', 'Notes', 'Website'
+        'Vibe (Tags)', 'Notes', 'Website'
       ];
       
       rows = (data as Venue[]).map(v => [
@@ -341,7 +375,7 @@ const App: React.FC = () => {
         v.reception_cost_pp,
         v.brunch_cost_pp,
         v.total_cost_pp,
-        v.vibe, 
+        Array.isArray(v.vibe) ? v.vibe.join(' | ') : v.vibe, // Joined with |
         v.notes,
         v.website_url
       ].map(formatValue).join(','));
