@@ -57,6 +57,8 @@ const venueSchema = {
     properties: {
       venue_name: { type: Type.STRING },
       location: { type: Type.STRING },
+      city: { type: Type.STRING },
+      state: { type: Type.STRING, description: "2-letter abbreviation (e.g. NY, CA)" },
       vibe: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING },
@@ -109,13 +111,14 @@ export const extractVenueData = async (file: File): Promise<Omit<Venue, 'id' | '
     
     CRITICAL INSTRUCTIONS:
     1. For Capacity: If multiple options exist, use the MAXIMUM capacity available.
-    2. For Vibe: Extract as a list of 3-5 distinct style keywords (e.g., 'Rustic', 'Modern', 'Waterfront'). Do not write full sentences. Capitalize the first letter of each keyword.
-    3. For Costs: If prices vary by date, assume the wedding is in DECEMBER.
-    4. For Notes: Create a 'Rate Card' summary (e.g., 'Site fee: $50k, Min guarantee: $60k').
-    5. For Welcome Dinner: Look for costs associated with a 4-hour premium open bar.
-    6. For Cocktail Hour: Look for costs associated with a 1-hour premium open bar. If listed separately from the reception package, extract it here.
-    7. For Reception: Look for costs associated with dinner + 4-hour premium open bar.
-    8. Calculate 'total_cost_pp' as the sum of reception, brunch, welcome, AND cocktail costs. Calculate this based on your extracted values.
+    2. For Location: Extract the full address into 'location'. Also extract 'city' and 'state' (2-letter abbreviation) separately.
+    3. For Vibe: Extract as a list of 3-5 distinct style keywords (e.g., 'Rustic', 'Modern', 'Waterfront'). Do not write full sentences. Capitalize the first letter of each keyword.
+    4. For Costs: If prices vary by date, assume the wedding is in DECEMBER.
+    5. For Notes: Create a 'Rate Card' summary (e.g., 'Site fee: $50k, Min guarantee: $60k').
+    6. For Welcome Dinner: Look for costs associated with a 4-hour premium open bar.
+    7. For Cocktail Hour: Look for costs associated with a 1-hour premium open bar. If listed separately from the reception package, extract it here.
+    8. For Reception: Look for costs associated with dinner + 4-hour premium open bar.
+    9. Calculate 'total_cost_pp' as the sum of reception, brunch, welcome, AND cocktail costs. Calculate this based on your extracted values.
   `;
 
   if (isExcelFile(file)) {
@@ -244,6 +247,8 @@ export const findVenueUrl = async (venueName: string, location: string): Promise
 export const enrichVenueDetails = async (venueName: string, location: string): Promise<{
   website_url?: string;
   location?: string;
+  city?: string;
+  state?: string;
   capacity?: number;
   vibe?: string[];
 } | null> => {
@@ -257,10 +262,11 @@ export const enrichVenueDetails = async (venueName: string, location: string): P
 Find the following details:
 1. Official Website URL
 2. Full Street Address
-3. Maximum Guest Capacity
-4. Vibe/Style (Extract as a list of 3-5 distinct keywords like 'Rustic', 'Modern', 'Garden')
+3. City and State (2-letter abbreviation)
+4. Maximum Guest Capacity
+5. Vibe/Style (Extract as a list of 3-5 distinct keywords like 'Rustic', 'Modern', 'Garden')
 
-Return the result as a VALID JSON object with the keys: "website_url", "location" (full address), "capacity" (number), and "vibe" (array of strings).
+Return the result as a VALID JSON object with the keys: "website_url", "location" (full address), "city", "state", "capacity" (number), and "vibe" (array of strings).
 Do not include Markdown formatting.
 If a value is not found, set it to null.`;
 
@@ -290,6 +296,8 @@ If a value is not found, set it to null.`;
       return {
         website_url: json.website_url || undefined,
         location: json.location || undefined,
+        city: json.city || undefined,
+        state: json.state || undefined,
         capacity: typeof json.capacity === 'number' ? json.capacity : (parseInt(json.capacity) || undefined),
         vibe: vibeArray.length > 0 ? vibeArray : undefined
       };

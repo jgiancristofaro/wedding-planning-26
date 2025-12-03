@@ -3,6 +3,8 @@ export interface Venue {
   id: string;
   venue_name: string;
   location: string;
+  city?: string; // New structured field
+  state?: string; // New structured field (2-letter code)
   vibe: string[]; // Changed to Array of Tags
   capacity: number;
   status: ConsiderationStatus;

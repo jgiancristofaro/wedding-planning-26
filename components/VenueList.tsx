@@ -16,7 +16,11 @@ type SortOption = 'total_pp-asc' | 'total_pp-desc' | 'capacity-desc' | 'name-asc
 export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onDeleteVenue, onEnrichVenue }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVibe, setSelectedVibe] = useState<string>('All');
-  const [selectedLocation, setSelectedLocation] = useState<string>('All');
+  
+  // New Filter States
+  const [selectedState, setSelectedState] = useState<string>('All');
+  const [selectedCity, setSelectedCity] = useState<string>('All');
+  
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [minCapacity, setMinCapacity] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
@@ -33,10 +37,21 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
     return ['All', ...Array.from(unique).sort()];
   }, [venues]);
 
-  const uniqueLocations = useMemo(() => {
-    const locs = new Set(venues.map(v => v.location?.trim() || 'Unknown'));
-    return ['All', ...Array.from(locs).sort()];
+  // Unique States (e.g. CA, NY)
+  const uniqueStates = useMemo(() => {
+    const states = new Set(venues.map(v => v.state).filter(Boolean));
+    return ['All', ...Array.from(states).sort()];
   }, [venues]);
+
+  // Unique Cities (Dependent on Selected State)
+  const uniqueCities = useMemo(() => {
+    let relevantVenues = venues;
+    if (selectedState !== 'All') {
+      relevantVenues = venues.filter(v => v.state === selectedState);
+    }
+    const cities = new Set(relevantVenues.map(v => v.city).filter(Boolean));
+    return ['All', ...Array.from(cities).sort()];
+  }, [venues, selectedState]);
 
   const filteredAndSortedVenues = useMemo(() => {
     return venues
@@ -50,7 +65,12 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
         const venueVibes = Array.isArray(venue.vibe) ? venue.vibe : [];
         const matchesVibe = selectedVibe === 'All' || venueVibes.includes(selectedVibe);
         
-        const matchesLocation = selectedLocation === 'All' || (venue.location?.trim() || 'Unknown') === selectedLocation;
+        // State Match
+        const matchesState = selectedState === 'All' || venue.state === selectedState;
+
+        // City Match
+        const matchesCity = selectedCity === 'All' || venue.city === selectedCity;
+
         const matchesStatus = selectedStatus === 'All' || (venue.status || "Haven't looked") === selectedStatus;
         
         const venueCapacity = venue.capacity || 0;
@@ -59,7 +79,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
         const matchesCapacity = minCapacity === '' || venueCapacity >= parseInt(minCapacity);
         const matchesPrice = maxPrice === '' || venueCostPP <= parseInt(maxPrice);
 
-        return matchesSearch && matchesVibe && matchesLocation && matchesStatus && matchesCapacity && matchesPrice;
+        return matchesSearch && matchesVibe && matchesState && matchesCity && matchesStatus && matchesCapacity && matchesPrice;
       })
       .sort((a, b) => {
         const costA = a.total_cost_pp || 0;
@@ -81,12 +101,13 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
           default: return 0;
         }
       });
-  }, [venues, searchTerm, selectedVibe, selectedLocation, selectedStatus, minCapacity, maxPrice, sortOption]);
+  }, [venues, searchTerm, selectedVibe, selectedState, selectedCity, selectedStatus, minCapacity, maxPrice, sortOption]);
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedVibe('All');
-    setSelectedLocation('All');
+    setSelectedState('All');
+    setSelectedCity('All');
     setSelectedStatus('All');
     setMinCapacity('');
     setMaxPrice('');
@@ -114,6 +135,11 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
     setEnrichingId(id);
     await onEnrichVenue(id);
     setEnrichingId(null);
+  };
+
+  // Helper function to safely format numbers (replaces toFixed error source)
+  const safeToFixed = (val: number | undefined | null, digits: number = 0) => {
+    return (val || 0).toFixed(digits);
   };
 
   if (venues.length === 0) {
@@ -166,7 +192,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-wedding-100 animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 pt-4 border-t border-wedding-100 animate-fade-in">
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Status</label>
               <select 
@@ -181,6 +207,35 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 <option value="No">No</option>
               </select>
             </div>
+            
+            {/* New State Filter */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">State</label>
+              <select 
+                value={selectedState} 
+                onChange={(e) => {
+                  setSelectedState(e.target.value);
+                  setSelectedCity('All'); // Reset city when state changes
+                }}
+                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
+              >
+                {uniqueStates.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+
+            {/* New City Filter */}
+             <div className="space-y-1">
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">City</label>
+              <select 
+                value={selectedCity} 
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
+                disabled={uniqueCities.length <= 1} // Disable if only 'All' exists
+              >
+                {uniqueCities.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Vibe (Tag)</label>
               <select 
@@ -189,16 +244,6 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
               >
                 {uniqueVibes.map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Location</label>
-              <select 
-                value={selectedLocation} 
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
-              >
-                {uniqueLocations.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div className="space-y-1">
@@ -221,7 +266,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                 className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
               />
             </div>
-            <div className="col-span-1 sm:col-span-2 lg:col-span-5 flex justify-end">
+            <div className="col-span-1 sm:col-span-2 lg:col-span-6 flex justify-end">
               <button onClick={clearFilters} className="text-xs text-wedding-600 hover:text-wedding-800 underline">
                 Reset all filters
               </button>
@@ -332,7 +377,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                     <div className="flex justify-between items-baseline mb-3">
                         <span className="text-xs font-bold text-wedding-500 uppercase tracking-widest">Total Cost / Person</span>
                         <div className="text-3xl font-serif font-bold text-wedding-900">
-                            ${(venue.total_cost_pp || 0).toFixed(0)}
+                            ${safeToFixed(venue.total_cost_pp, 0)}
                         </div>
                     </div>
                     {/* Breakdown */}

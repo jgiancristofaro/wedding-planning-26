@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator, Globe, Sparkles, Loader2 } from 'lucide-react';
+import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator, Globe, Sparkles, Loader2, Building2 } from 'lucide-react';
 import { enrichVenueDetails } from '../services/geminiService';
 
 interface VenueModalProps {
@@ -15,6 +15,8 @@ interface VenueModalProps {
 const DEFAULT_VENUE: Omit<Venue, 'id'> = {
   venue_name: '',
   location: '',
+  city: '',
+  state: '',
   vibe: [], // Initialized as array
   capacity: 0,
   status: "Haven't looked",
@@ -46,7 +48,9 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
         ...DEFAULT_VENUE,
         ...rest,
         cocktail_cost_pp: rest.cocktail_cost_pp || 0,
-        website_url: rest.website_url || ''
+        website_url: rest.website_url || '',
+        city: rest.city || '',
+        state: rest.state || ''
       });
       // Convert array to string for editing
       setVibeInput(Array.isArray(rest.vibe) ? rest.vibe.join(', ') : (rest.vibe || ''));
@@ -90,6 +94,8 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
           website_url: prev.website_url || enriched.website_url || '',
           // Update location to full address if enriched is longer/better, otherwise keep existing
           location: (enriched.location && enriched.location.length > (prev.location || '').length) ? enriched.location : (prev.location || enriched.location || ''),
+          city: enriched.city || prev.city || '',
+          state: enriched.state || prev.state || '',
           // Fill capacity if missing
           capacity: prev.capacity || enriched.capacity || 0,
           // Fill vibe if missing, note: we update vibeInput below
@@ -181,8 +187,37 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                     required
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-wedding-700">Location</label>
+                
+                {/* City and State */}
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-1">
+                    <label className="text-xs font-bold text-wedding-700">City</label>
+                    <div className="relative">
+                       <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                       <input
+                        type="text"
+                        value={formData.city}
+                        onChange={(e) => handleChange('city', e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
+                        placeholder="e.g. Napa"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-wedding-700">State</label>
+                    <input
+                      type="text"
+                      value={formData.state}
+                      onChange={(e) => handleChange('state', e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none uppercase"
+                      placeholder="CA"
+                      maxLength={2}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-bold text-wedding-700">Full Address / Location</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -190,10 +225,11 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                       value={formData.location}
                       onChange={(e) => handleChange('location', e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-wedding-200 rounded-lg focus:ring-2 focus:ring-wedding-500 focus:outline-none"
-                      placeholder="e.g. Napa Valley, CA"
+                      placeholder="e.g. 123 Vine St, Napa Valley, CA 94558"
                     />
                   </div>
                 </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-wedding-700">Website URL</label>
                   <div className="relative">

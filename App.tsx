@@ -24,12 +24,19 @@ const App: React.FC = () => {
       try {
         const parsedState = JSON.parse(saved);
         
-        // MIGRATION: Convert 'vibe' string to string[] if needed
+        // MIGRATION: 
         if (parsedState.venues) {
-          parsedState.venues = parsedState.venues.map((v: any) => ({
-            ...v,
-            vibe: Array.isArray(v.vibe) ? v.vibe : (v.vibe && typeof v.vibe === 'string' ? v.vibe.split(',').map((s: string) => s.trim()).filter(Boolean) : [])
-          }));
+          parsedState.venues = parsedState.venues.map((v: any) => {
+            // 1. Convert 'vibe' string to string[] if needed
+            let newVibe = Array.isArray(v.vibe) ? v.vibe : (v.vibe && typeof v.vibe === 'string' ? v.vibe.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+            
+            return {
+              ...v,
+              vibe: newVibe,
+              // Note: We leave city/state null here if missing, allowing the robust useEffect migration to handle it
+              // consistently for both local and cloud data.
+            };
+          });
         }
         
         return parsedState;
@@ -172,6 +179,56 @@ const App: React.FC = () => {
     }
   };
 
+  // --- MIGRATION EFFECT ---
+  // Robust backfill of City/State from Location string
+  useEffect(() => {
+    const venues = state.venues;
+    let hasUpdates = false;
+    
+    const migratedVenues = venues.map(venue => {
+      // Condition: Check if missing city or state
+      if ((!venue.city || !venue.state) && venue.location) {
+        let newCity = venue.city;
+        let newState = venue.state;
+
+        const parts = venue.location.split(',');
+
+        if (parts.length >= 2) {
+          // Step 1: Parse State (Last segment)
+          let rawState = parts[parts.length - 1];
+          // Remove 5-digit zip codes
+          rawState = rawState.replace(/\b\d{5}\b/g, '');
+          // Remove text in parentheses
+          rawState = rawState.replace(/\(.*\)/g, '');
+          newState = rawState.trim();
+
+          // Step 2: Parse City (Second to last segment)
+          newCity = parts[parts.length - 2].trim();
+        } else {
+          // Fallback: No commas, assume location is city
+          newCity = parts[0].trim();
+          newState = "Unknown";
+        }
+
+        // Ensure we don't save empty strings
+        if (!newCity) newCity = "Unknown";
+        if (!newState) newState = "Unknown";
+
+        // Only mark update if data actually changed
+        if (newCity !== venue.city || newState !== venue.state) {
+          hasUpdates = true;
+          return { ...venue, city: newCity, state: newState };
+        }
+      }
+      return venue;
+    });
+
+    if (hasUpdates) {
+      console.log(`Migrated ${migratedVenues.filter((v, i) => v !== venues[i]).length} venues with new City/State data`);
+      updateData({ ...state, venues: migratedVenues });
+    }
+  }, [state.venues]);
+
   // --- VENUE HANDLERS ---
 
   const handleVenueComplete = (newVenuesData: Omit<Venue, 'id' | 'status'>[]) => {
@@ -222,6 +279,9 @@ const App: React.FC = () => {
         newVenues[existingIndex] = {
           ...existing,
           ...safeExtracted,
+          // Preserve city/state if extraction failed to get them but we have them locally
+          city: safeExtracted.city || existing.city,
+          state: safeExtracted.state || existing.state,
           // Preserve existing text if new extraction is empty/poor, otherwise overwrite
           notes: safeExtracted.notes || existing.notes,
           
@@ -354,7 +414,7 @@ const App: React.FC = () => {
 
     if (type === 'venues') {
       headers = [
-        'Venue Name', 'Status', 'Location', 'Capacity', 'Booking Cost', 
+        'Venue Name', 'Status', 'Location', 'City', 'State', 'Capacity', 'Booking Cost', 
         'Site Fee', 'Site Fee Notes', 'F&B Minimum', 'Admin Fees',
         'Welcome Cost/pp', 'Cocktail Hour Cost/pp', 'Reception Cost/pp', 'Brunch Cost/pp', 'Total Cost/pp',
         'Vibe (Tags)', 'Notes', 'Website'
@@ -364,6 +424,8 @@ const App: React.FC = () => {
         v.venue_name, 
         v.status || "Haven't looked", 
         v.location, 
+        v.city,
+        v.state,
         v.capacity, 
         v.booking_cost,
         v.site_fee,
