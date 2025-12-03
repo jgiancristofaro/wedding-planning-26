@@ -1,8 +1,8 @@
-
 import React, { useState, useMemo } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
-import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2, Utensils, Sparkles, Globe, ExternalLink, Loader2 } from 'lucide-react';
+import { MapPin, Users, DollarSign, Info, Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Edit2, Utensils, Sparkles, Globe, ExternalLink, Loader2, Building2 } from 'lucide-react';
 import { VenueModal } from './VenueModal';
+import { MultiSelect } from './MultiSelect';
 
 interface VenueListProps {
   venues: Venue[];
@@ -15,13 +15,13 @@ type SortOption = 'total_pp-asc' | 'total_pp-desc' | 'capacity-desc' | 'name-asc
 
 export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onDeleteVenue, onEnrichVenue }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVibe, setSelectedVibe] = useState<string>('All');
   
-  // New Filter States
-  const [selectedState, setSelectedState] = useState<string>('All');
-  const [selectedCity, setSelectedCity] = useState<string>('All');
+  // Refactored to arrays for MultiSelect
+  const [selectedVibe, setSelectedVibe] = useState<string[]>([]);
+  const [selectedState, setSelectedState] = useState<string[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
   
-  const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [minCapacity, setMinCapacity] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [sortOption, setSortOption] = useState<SortOption>('total_pp-desc');
@@ -34,23 +34,24 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
     // Flatten all vibe arrays from all venues
     const allVibes = venues.flatMap(v => Array.isArray(v.vibe) ? v.vibe : []);
     const unique = new Set(allVibes);
-    return ['All', ...Array.from(unique).sort()];
+    return Array.from(unique).sort();
   }, [venues]);
 
   // Unique States (e.g. CA, NY)
   const uniqueStates = useMemo(() => {
     const states = new Set(venues.map(v => v.state).filter(Boolean));
-    return ['All', ...Array.from(states).sort()];
+    return Array.from(states).sort();
   }, [venues]);
 
-  // Unique Cities (Dependent on Selected State)
+  // Unique Cities (Dependent on Selected State(s))
   const uniqueCities = useMemo(() => {
     let relevantVenues = venues;
-    if (selectedState !== 'All') {
-      relevantVenues = venues.filter(v => v.state === selectedState);
+    // If specific states are selected, filter cities by those states
+    if (selectedState.length > 0) {
+      relevantVenues = venues.filter(v => v.state && selectedState.includes(v.state));
     }
     const cities = new Set(relevantVenues.map(v => v.city).filter(Boolean));
-    return ['All', ...Array.from(cities).sort()];
+    return Array.from(cities).sort();
   }, [venues, selectedState]);
 
   const filteredAndSortedVenues = useMemo(() => {
@@ -61,17 +62,18 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
           (venue.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
           (venue.location || '').toLowerCase().includes(searchTerm.toLowerCase());
         
-        // Vibe match: check if the array includes the selected vibe
+        // Vibe match: (Empty = All) OR venue has at least one of the selected tags
         const venueVibes = Array.isArray(venue.vibe) ? venue.vibe : [];
-        const matchesVibe = selectedVibe === 'All' || venueVibes.includes(selectedVibe);
+        const matchesVibe = selectedVibe.length === 0 || venueVibes.some(v => selectedVibe.includes(v));
         
-        // State Match
-        const matchesState = selectedState === 'All' || venue.state === selectedState;
+        // State Match: (Empty = All) OR state is in selection
+        const matchesState = selectedState.length === 0 || (venue.state && selectedState.includes(venue.state));
 
-        // City Match
-        const matchesCity = selectedCity === 'All' || venue.city === selectedCity;
+        // City Match: (Empty = All) OR city is in selection
+        const matchesCity = selectedCity.length === 0 || (venue.city && selectedCity.includes(venue.city));
 
-        const matchesStatus = selectedStatus === 'All' || (venue.status || "Haven't looked") === selectedStatus;
+        // Status Match: (Empty = All) OR status is in selection
+        const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(venue.status || "Haven't looked");
         
         const venueCapacity = venue.capacity || 0;
         const venueCostPP = venue.total_cost_pp || 0;
@@ -105,10 +107,10 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedVibe('All');
-    setSelectedState('All');
-    setSelectedCity('All');
-    setSelectedStatus('All');
+    setSelectedVibe([]);
+    setSelectedState([]);
+    setSelectedCity([]);
+    setSelectedStatus([]);
     setMinCapacity('');
     setMaxPrice('');
     setSortOption('total_pp-desc');
@@ -137,10 +139,11 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
     setEnrichingId(null);
   };
 
-  // Helper function to safely format numbers (replaces toFixed error source)
   const safeToFixed = (val: number | undefined | null, digits: number = 0) => {
     return (val || 0).toFixed(digits);
   };
+
+  const statusOptions = ["Priority", "Maybe", "Haven't looked", "No"];
 
   if (venues.length === 0) {
     return (
@@ -193,77 +196,71 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
 
         {showFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 pt-4 border-t border-wedding-100 animate-fade-in">
+            
+            {/* Status Filter */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Status</label>
-              <select 
-                value={selectedStatus} 
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Priority">Priority</option>
-                <option value="Maybe">Maybe</option>
-                <option value="Haven't looked">New / Unseen</option>
-                <option value="No">No</option>
-              </select>
+              <MultiSelect 
+                label="Status"
+                options={statusOptions}
+                selected={selectedStatus}
+                onChange={setSelectedStatus}
+              />
             </div>
             
-            {/* New State Filter */}
+            {/* State Filter */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">State</label>
-              <select 
-                value={selectedState} 
-                onChange={(e) => {
-                  setSelectedState(e.target.value);
-                  setSelectedCity('All'); // Reset city when state changes
+              <MultiSelect 
+                label="State"
+                options={uniqueStates}
+                selected={selectedState}
+                onChange={(newStates) => {
+                  setSelectedState(newStates);
+                  // Optional: Reset cities if they don't belong to selected states
+                  // keeping it simple for now, relying on dependent filter logic to hide irrelevant cities
+                  setSelectedCity([]); 
                 }}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
-              >
-                {uniqueStates.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
+              />
             </div>
 
-            {/* New City Filter */}
-             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">City</label>
-              <select 
-                value={selectedCity} 
-                onChange={(e) => setSelectedCity(e.target.value)}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
-                disabled={uniqueCities.length <= 1} // Disable if only 'All' exists
-              >
-                {uniqueCities.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
+            {/* City Filter */}
+            <div className="space-y-1">
+               <MultiSelect 
+                label="City"
+                options={uniqueCities}
+                selected={selectedCity}
+                onChange={setSelectedCity}
+                disabled={uniqueCities.length === 0}
+              />
+            </div>
+
+            {/* Vibe Filter */}
+            <div className="space-y-1">
+              <MultiSelect 
+                label="Vibe"
+                options={uniqueVibes}
+                selected={selectedVibe}
+                onChange={setSelectedVibe}
+              />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Vibe (Tag)</label>
-              <select 
-                value={selectedVibe} 
-                onChange={(e) => setSelectedVibe(e.target.value)}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
-              >
-                {uniqueVibes.map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Min Capacity</label>
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider block mb-1">Min Capacity</label>
               <input 
                 type="number" 
                 placeholder="e.g. 150"
                 value={minCapacity}
                 onChange={(e) => setMinCapacity(e.target.value)}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
+                className="w-full px-3 py-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400 focus:bg-white transition-colors"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider">Max Total PP ($)</label>
+              <label className="text-xs font-bold text-wedding-500 uppercase tracking-wider block mb-1">Max Total PP ($)</label>
               <input 
                 type="number" 
                 placeholder="e.g. 500"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
-                className="w-full p-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400"
+                className="w-full px-3 py-2 bg-wedding-50 border border-wedding-200 rounded-md text-sm focus:outline-none focus:border-wedding-400 focus:bg-white transition-colors"
               />
             </div>
             <div className="col-span-1 sm:col-span-2 lg:col-span-6 flex justify-end">
@@ -422,6 +419,13 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                       <div className="flex flex-col">
                           <span className="text-[10px] uppercase text-gray-400 font-bold">F&B Minimum</span>
                           <span className="font-medium">${(venue.food_bev_minimum || 0).toLocaleString()}</span>
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-3 text-gray-700">
+                      <Building2 className="w-4 h-4 text-wedding-400" />
+                      <div className="flex flex-col">
+                          <span className="text-[10px] uppercase text-gray-400 font-bold">City</span>
+                          <span className="font-medium">{venue.city || '-'}</span>
                       </div>
                    </div>
                 </div>
