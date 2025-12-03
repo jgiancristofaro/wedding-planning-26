@@ -1,4 +1,5 @@
 
+
 export interface Venue {
   id: string;
   venue_name: string;
@@ -31,7 +32,7 @@ export interface Venue {
   updateDescription?: string;
 }
 
-export type ConsiderationStatus = "Haven't looked" | "No" | "Maybe" | "Priority";
+export type ConsiderationStatus = "Haven't looked" | "No" | "Maybe" | "Interested" | "Priority";
 
 export interface Vendor {
   id: string;

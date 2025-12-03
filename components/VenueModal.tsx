@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Venue, ConsiderationStatus } from '../types';
 import { X, Save, MapPin, Users, DollarSign, Tag, FileText, Plus, Trash2, Calculator, Globe, Sparkles, Loader2, Building2 } from 'lucide-react';
@@ -277,6 +278,7 @@ export const VenueModal: React.FC<VenueModalProps> = ({ venue, isOpen, onClose, 
                   >
                       <option value="Haven't looked">Haven't looked</option>
                       <option value="Maybe">Maybe</option>
+                      <option value="Interested">Interested</option>
                       <option value="Priority">Priority</option>
                       <option value="No">No</option>
                   </select>

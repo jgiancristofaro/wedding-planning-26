@@ -95,7 +95,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
           case 'capacity-desc': return capB - capA;
           case 'name-asc': return (a.venue_name || '').localeCompare(b.venue_name || '');
           case 'status': {
-             const order: Record<ConsiderationStatus, number> = { 'Priority': 0, 'Maybe': 1, "Haven't looked": 2, 'No': 3 };
+             const order: Record<ConsiderationStatus, number> = { 'Priority': 0, 'Interested': 1, 'Maybe': 2, "Haven't looked": 3, 'No': 4 };
              const statusA = a.status || "Haven't looked";
              const statusB = b.status || "Haven't looked";
              return order[statusA] - order[statusB];
@@ -119,6 +119,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
   const getStatusStyle = (status: ConsiderationStatus) => {
     switch (status) {
       case 'Priority': return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
+      case 'Interested': return 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200';
       case 'Maybe': return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200';
       case 'No': return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200';
@@ -143,7 +144,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
     return (val || 0).toFixed(digits);
   };
 
-  const statusOptions = ["Priority", "Maybe", "Haven't looked", "No"];
+  const statusOptions = ["Priority", "Interested", "Maybe", "Haven't looked", "No"];
 
   if (venues.length === 0) {
     return (
@@ -360,6 +361,7 @@ export const VenueList: React.FC<VenueListProps> = ({ venues, onUpdateVenue, onD
                     >
                       <option value="Haven't looked">New</option>
                       <option value="Maybe">Maybe</option>
+                      <option value="Interested">Interested</option>
                       <option value="Priority">Priority</option>
                       <option value="No">No</option>
                     </select>
